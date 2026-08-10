@@ -6,14 +6,14 @@ import {
   ThermometerIcon, Check, X, Info, WashingMachineIcon,
   Camera, Upload, Star, BookmarkCheck, Tag, User, Cpu,
   SlidersHorizontal, ChevronDown, ChevronUp, Clock,
-  Bookmark, RefreshCw, ImageIcon, Zap
+  Bookmark, RefreshCw, ImageIcon, Zap, MessageSquare, Send, SmilePlus
 } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-type MainView = "home" | "symbols" | "wardrobe" | "plan";
+type MainView = "home" | "symbols" | "wardrobe" | "plan" | "feedback";
 type SymbolsSubview = "guide" | "detail";
 type WardrobeSubview = "list" | "form" | "tag-upload" | "symbol-review" | "frequent";
-type PlanSubview = "priority" | "results" | "saved";
+type PlanSubview = "priority" | "results" | "saved" | "saved-detail";
 type ColorGroup = "white" | "light" | "dark" | "bright";
 type FabricType = "cotton" | "wool" | "silk" | "synthetic" | "denim" | "linen" | "blend";
 type WashTemp = "cold" | "warm" | "hot";
@@ -23,7 +23,7 @@ type SymbolCategory = "all" | "washing" | "drying" | "ironing" | "bleaching" | "
 interface Garment {
   id: string; name: string; colorGroup: ColorGroup; fabricType: FabricType;
   washTemp: WashTemp; isDelicate: boolean; handWashOnly: boolean; dryerSafe: boolean;
-  isFavorite?: boolean;
+  isFavorite?: boolean; selectedSymbols?: string[];
 }
 interface CareSymbol {
   id: string; category: "washing" | "drying" | "ironing" | "bleaching" | "professional";
@@ -36,7 +36,7 @@ interface LaundryLoad {
 interface LaundryPlan { loads: LaundryLoad[]; handWashItems: Garment[]; }
 interface SavedPlan {
   id: string; name: string; date: string; mode: PriorityMode;
-  loadCount: number; garmentCount: number;
+  loadCount: number; garmentCount: number; plan: LaundryPlan;
 }
 interface DetectedSymbol {
   symbol: CareSymbol; confidence: number; confirmed: boolean | null;
@@ -213,7 +213,7 @@ function NavBar({ view, onNav, garmentCount }: { view: MainView; onNav: (v: Main
     <>
       <header className="fixed top-0 left-0 right-0 z-50 bg-card/95 backdrop-blur border-b border-border">
         <div className="max-w-4xl mx-auto px-4 sm:px-5 h-14 flex items-center justify-between">
-          <span className="text-lg text-primary" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 600 }}>ThreadCare</span>
+          <button onClick={() => onNav("home")} className="text-lg text-primary hover:opacity-75 transition-opacity" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 600 }}>ThreadCare</button>
           <nav className="hidden sm:flex items-center gap-1">
             {navItems.map(item => (
               <button key={item.id} onClick={() => onNav(item.id)}
@@ -265,8 +265,9 @@ function SectionHeader({ eyebrow, title, subtitle }: { eyebrow: string; title: s
 }
 
 // ─── Home View ───────────────────────────────────────────────────────────────
-function HomeView({ garmentCount, onNav, savedPlans, onViewSaved }: {
-  garmentCount: number; onNav: (v: MainView) => void; savedPlans: SavedPlan[]; onViewSaved: () => void;
+function HomeView({ garmentCount, onNav, savedPlans, onViewSaved, onViewPlan }: {
+  garmentCount: number; onNav: (v: MainView) => void; savedPlans: SavedPlan[];
+  onViewSaved: () => void; onViewPlan: (plan: SavedPlan) => void;
 }) {
   const entries = [
     { icon: <Sparkles size={20} />, title: "Create a Laundry Plan", desc: "Group your garments into optimized loads with wash settings.", action: () => onNav("plan"), color: "bg-primary text-primary-foreground", cta: "Start Planning" },
@@ -315,52 +316,82 @@ function HomeView({ garmentCount, onNav, savedPlans, onViewSaved }: {
           </div>
           <div className="space-y-2">
             {savedPlans.slice(0, 2).map(plan => (
-              <div key={plan.id} className="flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-3">
+              <button key={plan.id} onClick={() => onViewPlan(plan)}
+                className="w-full flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-3 text-left hover:border-primary/30 hover:shadow-sm active:scale-[0.99] transition-all duration-150">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0"><Bookmark size={15} className="text-primary" /></div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-foreground text-sm truncate">{plan.name}</p>
                   <p className="text-xs text-muted-foreground font-mono">{plan.date} · {plan.loadCount} loads · {plan.garmentCount} garments</p>
                 </div>
-                <Badge variant="teal">{MODE_LABELS[plan.mode].split(" ")[0]}</Badge>
-              </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <Badge variant="teal">{MODE_LABELS[plan.mode].split(" ")[0]}</Badge>
+                  <ChevronRight size={13} className="text-muted-foreground" />
+                </div>
+              </button>
             ))}
           </div>
         </div>
       )}
 
       <div className="grid grid-cols-3 divide-x divide-border bg-card border border-border rounded-xl overflow-hidden mb-8 sm:mb-10">
-        {[{ value: garmentCount, label: "Garments Saved" }, { value: CARE_SYMBOLS.length, label: "Symbols" }, { value: 3, label: "Plan Modes" }].map((s, i) => (
-          <div key={i} className="flex flex-col items-center justify-center py-4 px-2 sm:px-4">
-            <p className="text-xl sm:text-2xl font-mono font-medium text-primary">{s.value}</p>
-            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 text-center">{s.label}</p>
-          </div>
+        {([
+          { value: garmentCount, label: "Garments Saved", nav: "wardrobe" as MainView },
+          { value: CARE_SYMBOLS.length, label: "Symbols", nav: "symbols" as MainView },
+          { value: 3, label: "Plan Modes", nav: "plan" as MainView },
+        ]).map((s, i) => (
+          <button key={i} onClick={() => onNav(s.nav)}
+            className="flex flex-col items-center justify-center py-4 px-2 sm:px-4 hover:bg-secondary/60 active:bg-secondary transition-colors duration-150 min-h-[72px] group">
+            <p className="text-xl sm:text-2xl font-mono font-medium text-primary group-hover:text-primary/80 transition-colors">{s.value}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 text-center group-hover:text-foreground transition-colors">{s.label}</p>
+          </button>
         ))}
       </div>
 
-      {/* Future Features teasers */}
-      <div>
-        <p className="text-xs font-mono tracking-widest text-muted-foreground uppercase mb-3">Coming Soon</p>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <div className="relative bg-card border border-border rounded-xl p-5 overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-[#5B7FA6]/5 rounded-full -translate-y-8 translate-x-8" />
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-lg bg-[#5B7FA6]/10 flex items-center justify-center flex-shrink-0"><Cpu size={18} className="text-[#5B7FA6]" /></div>
-              <div>
-                <div className="flex items-center gap-2 mb-1"><span className="font-semibold text-foreground text-sm" style={{ fontFamily: "'Playfair Display', serif" }}>Auto Symbol Recognition</span><Badge variant="future">Soon</Badge></div>
-                <p className="text-xs text-muted-foreground leading-relaxed">Point your camera at a care label — ThreadCare will identify all symbols instantly using on-device computer vision.</p>
+      {/* Future Features teasers + Feedback */}
+      <div className="grid sm:grid-cols-3 gap-3">
+        <div className="sm:col-span-2">
+          <p className="text-xs font-mono tracking-widest text-muted-foreground uppercase mb-3">Coming Soon</p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="relative bg-card border border-border rounded-xl p-5 overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-[#5B7FA6]/5 rounded-full -translate-y-8 translate-x-8" />
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-[#5B7FA6]/10 flex items-center justify-center flex-shrink-0"><Cpu size={18} className="text-[#5B7FA6]" /></div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1"><span className="font-semibold text-foreground text-sm" style={{ fontFamily: "'Playfair Display', serif" }}>Auto Symbol Recognition</span><Badge variant="future">Soon</Badge></div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">Point your camera at a care label — ThreadCare will identify all symbols instantly using on-device computer vision.</p>
+                </div>
+              </div>
+            </div>
+            <div className="relative bg-card border border-border rounded-xl p-5 overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-8 translate-x-8" />
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0"><User size={18} className="text-primary" /></div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1"><span className="font-semibold text-foreground text-sm" style={{ fontFamily: "'Playfair Display', serif" }}>User Accounts</span><Badge variant="future">Soon</Badge></div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">Sync your wardrobe and saved plans across devices. Share laundry settings with household members.</p>
+                </div>
               </div>
             </div>
           </div>
-          <div className="relative bg-card border border-border rounded-xl p-5 overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-8 translate-x-8" />
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0"><User size={18} className="text-primary" /></div>
-              <div>
-                <div className="flex items-center gap-2 mb-1"><span className="font-semibold text-foreground text-sm" style={{ fontFamily: "'Playfair Display', serif" }}>User Accounts</span><Badge variant="future">Soon</Badge></div>
-                <p className="text-xs text-muted-foreground leading-relaxed">Sync your wardrobe and saved plans across devices. Share laundry settings with household members.</p>
+        </div>
+
+        {/* Feedback entry */}
+        <div className="flex flex-col">
+          <p className="text-xs font-mono tracking-widest text-muted-foreground uppercase mb-3">Your Voice</p>
+          <button onClick={() => onNav("feedback")}
+            className="flex-1 relative bg-accent/8 border border-accent/20 rounded-xl p-5 text-left hover:bg-accent/12 hover:border-accent/35 active:scale-[0.99] transition-all duration-150 overflow-hidden group">
+            <div className="absolute bottom-0 right-0 w-28 h-28 bg-accent/8 rounded-full translate-x-8 translate-y-8" />
+            <div className="relative">
+              <div className="w-9 h-9 rounded-lg bg-accent/15 flex items-center justify-center mb-3">
+                <MessageSquare size={18} className="text-accent" />
               </div>
+              <p className="font-semibold text-foreground text-sm mb-1" style={{ fontFamily: "'Playfair Display', serif" }}>Share Feedback</p>
+              <p className="text-xs text-muted-foreground leading-relaxed mb-4">Help shape ThreadCare. Tell us what works, what's missing, and what you'd love to see next.</p>
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-accent group-hover:gap-2 transition-all">
+                Leave feedback <ChevronRight size={12} />
+              </span>
             </div>
-          </div>
+          </button>
         </div>
       </div>
     </PageShell>
@@ -550,13 +581,122 @@ function SymbolDetailView({ symbol, onBack }: { symbol: CareSymbol; onBack: () =
 }
 
 // ─── Garment Entry Form (with edit change summary + scan tag entry) ───────────
-const EMPTY_FORM = { name: "", colorGroup: "white" as ColorGroup, fabricType: "cotton" as FabricType, washTemp: "cold" as WashTemp, isDelicate: false, handWashOnly: false, dryerSafe: true };
+// ─── SymbolPicker ─────────────────────────────────────────────────────────────
+function SymbolPicker({ selected, onChange }: { selected: string[]; onChange: (ids: string[]) => void }) {
+  const categories = ["washing", "drying", "ironing", "bleaching", "professional"] as const;
+  const [activeCategory, setActiveCategory] = useState<typeof categories[number]>("washing");
+
+  const toggle = (id: string) => {
+    onChange(selected.includes(id) ? selected.filter(s => s !== id) : [...selected, id]);
+  };
+
+  const categorySymbols = CARE_SYMBOLS.filter(s => s.category === activeCategory);
+  const selectedSet = new Set(selected);
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-4 sm:p-5">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-mono tracking-widest text-muted-foreground uppercase">Care Label Symbols</p>
+        {selected.length > 0 && (
+          <span className="flex items-center gap-1.5 text-xs font-mono text-primary bg-primary/8 border border-primary/20 px-2 py-0.5 rounded-full">
+            <Check size={10} />
+            {selected.length} selected
+          </span>
+        )}
+      </div>
+
+      {/* Selected summary strip */}
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4 p-3 bg-primary/5 border border-primary/15 rounded-lg">
+          {selected.map(id => {
+            const sym = CARE_SYMBOLS.find(s => s.id === id);
+            if (!sym) return null;
+            return (
+              <button key={id} type="button" onClick={() => toggle(id)}
+                title={`Remove ${sym.name}`}
+                className="flex items-center gap-1.5 bg-card border border-primary/25 rounded-lg px-2 py-1 text-xs text-primary hover:bg-accent/10 hover:border-accent/40 transition-all group min-h-[32px]">
+                <SymbolSVG symbol={sym} size={18} className="flex-shrink-0" />
+                <span className="leading-tight max-w-[80px] truncate" style={{ fontFamily: "'DM Sans', sans-serif" }}>{sym.name}</span>
+                <X size={10} className="flex-shrink-0 text-muted-foreground group-hover:text-accent" />
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Category tabs */}
+      <div className="flex gap-1.5 mb-4 overflow-x-auto pb-0.5 scrollbar-hide -mx-1 px-1">
+        {categories.map(cat => {
+          const count = CARE_SYMBOLS.filter(s => s.category === cat && selectedSet.has(s.id)).length;
+          return (
+            <button key={cat} type="button" onClick={() => setActiveCategory(cat)}
+              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150 min-h-[32px]
+                ${activeCategory === cat ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"}`}>
+              {SYMBOL_CATEGORY_LABELS[cat]}
+              {count > 0 && (
+                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-mono
+                  ${activeCategory === cat ? "bg-white/25 text-white" : "bg-primary/15 text-primary"}`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Symbol grid */}
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-2.5">
+        {categorySymbols.map(sym => {
+          const isSelected = selectedSet.has(sym.id);
+          return (
+            <button key={sym.id} type="button" onClick={() => toggle(sym.id)}
+              className={`relative flex flex-col items-center gap-2 px-2 py-3 rounded-xl border transition-all duration-150 min-h-[88px] group
+                ${isSelected
+                  ? "border-primary bg-primary/8 shadow-[inset_0_0_0_1px] shadow-primary/20"
+                  : "border-border hover:border-primary/30 hover:bg-secondary/50"}`}>
+              {isSelected && (
+                <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-primary rounded-full flex items-center justify-center">
+                  <Check size={9} className="text-white" />
+                </span>
+              )}
+              <div className={`transition-opacity ${isSelected ? "opacity-100" : "opacity-70 group-hover:opacity-90"}`}>
+                <SymbolSVG symbol={sym} size={34} />
+              </div>
+              <p className={`text-[10px] text-center leading-tight line-clamp-2 font-medium
+                ${isSelected ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}
+                style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                {sym.name}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+
+      {selected.length === 0 && (
+        <p className="mt-3 text-[11px] text-muted-foreground text-center" style={{ fontFamily: "'DM Mono', monospace" }}>
+          Select the symbols found on this garment's care label
+        </p>
+      )}
+    </div>
+  );
+}
+
+const EMPTY_FORM = { name: "", colorGroup: "white" as ColorGroup, fabricType: "cotton" as FabricType, washTemp: "cold" as WashTemp, isDelicate: false, handWashOnly: false, dryerSafe: true, selectedSymbols: [] as string[] };
+
+const SYMBOL_CATEGORY_LABELS: Record<string, string> = {
+  washing: "Washing",
+  drying: "Drying",
+  ironing: "Ironing",
+  bleaching: "Bleaching",
+  professional: "Professional",
+};
 
 function GarmentForm({ editing, onSave, onCancel, onScanTag, scannedSymbols }: {
   editing?: Garment; onSave: (g: Garment) => void; onCancel: () => void;
   onScanTag: () => void; scannedSymbols?: DetectedSymbol[];
 }) {
-  const [form, setForm] = useState(editing ? { ...editing } : { ...EMPTY_FORM, id: "" });
+  const [form, setForm] = useState(editing ? { ...EMPTY_FORM, ...editing, selectedSymbols: editing.selectedSymbols ?? [] } : { ...EMPTY_FORM, id: "" });
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm(prev => ({ ...prev, [k]: v }));
 
   // Apply confirmed scanned symbols when they arrive
@@ -589,6 +729,12 @@ function GarmentForm({ editing, onSave, onCancel, onScanTag, scannedSymbols }: {
     if (editing.isDelicate !== form.isDelicate) diffs.push(`Delicate: ${editing.isDelicate ? "On" : "Off"} → ${form.isDelicate ? "On" : "Off"}`);
     if (editing.handWashOnly !== form.handWashOnly) diffs.push(`Hand wash: ${editing.handWashOnly ? "Required" : "Not required"} → ${form.handWashOnly ? "Required" : "Not required"}`);
     if (editing.dryerSafe !== form.dryerSafe) diffs.push(`Dryer: ${editing.dryerSafe ? "Safe" : "Avoid"} → ${form.dryerSafe ? "Safe" : "Avoid"}`);
+    const prevSyms = editing.selectedSymbols ?? [];
+    const nextSyms = form.selectedSymbols ?? [];
+    const added = nextSyms.filter(s => !prevSyms.includes(s));
+    const removed = prevSyms.filter(s => !nextSyms.includes(s));
+    if (added.length > 0) diffs.push(`Symbols added: ${added.map(id => CARE_SYMBOLS.find(s => s.id === id)?.name ?? id).join(", ")}`);
+    if (removed.length > 0) diffs.push(`Symbols removed: ${removed.map(id => CARE_SYMBOLS.find(s => s.id === id)?.name ?? id).join(", ")}`);
     return diffs;
   }, [editing, form]);
 
@@ -698,6 +844,12 @@ function GarmentForm({ editing, onSave, onCancel, onScanTag, scannedSymbols }: {
             </div>
           </div>
 
+          {/* Care Label Symbols */}
+          <SymbolPicker
+            selected={form.selectedSymbols ?? []}
+            onChange={vals => set("selectedSymbols", vals)}
+          />
+
           {/* Edit change summary */}
           {editing && changes.length > 0 && (
             <div className="bg-amber-50 border border-[#B85C38]/20 rounded-xl p-4 sm:p-5">
@@ -772,9 +924,338 @@ function FrequentItemsSection({ garments, onEdit }: { garments: Garment[]; onEdi
   );
 }
 
+// ─── Inline Symbol Picker (compact, for GarmentRow panels) ──────────────────
+function InlineSymbolPicker({ selected, onChange }: { selected: string[]; onChange: (ids: string[]) => void }) {
+  const categories = ["washing", "drying", "ironing", "bleaching", "professional"] as const;
+  const [activeCategory, setActiveCategory] = useState<typeof categories[number]>("washing");
+  const selectedSet = new Set(selected);
+
+  const toggle = (id: string) => {
+    onChange(selected.includes(id) ? selected.filter(s => s !== id) : [...selected, id]);
+  };
+
+  const categorySymbols = CARE_SYMBOLS.filter(s => s.category === activeCategory);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">Care Label Symbols</p>
+        {selected.length > 0 && (
+          <span className="text-[10px] font-mono text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-full">
+            {selected.length} selected
+          </span>
+        )}
+      </div>
+
+      {/* Selected chips */}
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3 p-2.5 bg-primary/5 border border-primary/15 rounded-lg">
+          {selected.map(id => {
+            const sym = CARE_SYMBOLS.find(s => s.id === id);
+            if (!sym) return null;
+            return (
+              <button key={id} type="button" onClick={() => toggle(id)}
+                title={`Remove ${sym.name}`}
+                className="flex items-center gap-1 bg-card border border-primary/20 rounded-md px-1.5 py-1 text-[10px] text-primary hover:border-accent/40 hover:bg-accent/5 transition-all group min-h-[28px]">
+                <SymbolSVG symbol={sym} size={14} className="flex-shrink-0 opacity-80" />
+                <span className="max-w-[64px] truncate leading-tight" style={{ fontFamily: "'DM Sans', sans-serif" }}>{sym.name}</span>
+                <X size={8} className="flex-shrink-0 text-muted-foreground group-hover:text-accent ml-0.5" />
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Category tabs */}
+      <div className="flex gap-1 mb-3 overflow-x-auto pb-0.5 -mx-0.5 px-0.5">
+        {categories.map(cat => {
+          const count = CARE_SYMBOLS.filter(s => s.category === cat && selectedSet.has(s.id)).length;
+          return (
+            <button key={cat} type="button" onClick={() => setActiveCategory(cat)}
+              className={`flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all min-h-[28px]
+                ${activeCategory === cat ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"}`}>
+              {SYMBOL_CATEGORY_LABELS[cat]}
+              {count > 0 && (
+                <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-mono
+                  ${activeCategory === cat ? "bg-white/25 text-white" : "bg-primary/15 text-primary"}`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Symbol grid */}
+      <div className="grid grid-cols-5 gap-1.5">
+        {categorySymbols.map(sym => {
+          const isSelected = selectedSet.has(sym.id);
+          return (
+            <button key={sym.id} type="button" onClick={() => toggle(sym.id)}
+              title={sym.name}
+              className={`relative flex flex-col items-center gap-1.5 px-1 py-2.5 rounded-lg border transition-all duration-150 min-h-[72px] group
+                ${isSelected
+                  ? "border-primary bg-primary/8 shadow-[inset_0_0_0_1px] shadow-primary/15"
+                  : "border-border hover:border-primary/25 hover:bg-secondary/50"}`}>
+              {isSelected && (
+                <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-primary rounded-full flex items-center justify-center">
+                  <Check size={8} className="text-white" />
+                </span>
+              )}
+              <div className={`transition-opacity ${isSelected ? "opacity-100" : "opacity-65 group-hover:opacity-85"}`}>
+                <SymbolSVG symbol={sym} size={28} />
+              </div>
+              <p className={`text-[9px] text-center leading-tight line-clamp-2 font-medium px-0.5
+                ${isSelected ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}
+                style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                {sym.name}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+
+      {selected.length === 0 && (
+        <p className="mt-2 text-[10px] text-muted-foreground text-center" style={{ fontFamily: "'DM Mono', monospace" }}>
+          Tap symbols from this garment's care label
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── Garment Row (expandable inline edit) ────────────────────────────────────
+function GarmentRow({ garment, onUpdate, onDelete, onToggleFavorite }: {
+  garment: Garment; onUpdate: (g: Garment) => void;
+  onDelete: (id: string) => void; onToggleFavorite: (id: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [form, setForm] = useState({ ...garment, selectedSymbols: garment.selectedSymbols ?? [] });
+  const set = <K extends keyof Garment>(k: K, v: Garment[K]) => setForm(prev => ({ ...prev, [k]: v }));
+
+  useEffect(() => { setForm({ ...garment, selectedSymbols: garment.selectedSymbols ?? [] }); }, [garment.id]);
+
+  const colorGroups: ColorGroup[] = ["white", "light", "dark", "bright"];
+  const fabrics: FabricType[] = ["cotton", "wool", "silk", "synthetic", "denim", "linen", "blend"];
+  const temps: WashTemp[] = ["cold", "warm", "hot"];
+
+  const hasChanges = useMemo(() => {
+    const symPrev = garment.selectedSymbols ?? [];
+    const symNext = form.selectedSymbols ?? [];
+    const symsChanged = symPrev.length !== symNext.length || symPrev.some(s => !symNext.includes(s));
+    return (
+      form.name !== garment.name || form.colorGroup !== garment.colorGroup ||
+      form.fabricType !== garment.fabricType || form.washTemp !== garment.washTemp ||
+      form.isDelicate !== garment.isDelicate || form.handWashOnly !== garment.handWashOnly ||
+      form.dryerSafe !== garment.dryerSafe || symsChanged
+    );
+  }, [form, garment]);
+
+  const changes = useMemo(() => {
+    const diffs: string[] = [];
+    if (garment.name !== form.name) diffs.push(`Name: "${garment.name}" → "${form.name}"`);
+    if (garment.washTemp !== form.washTemp) diffs.push(`Wash temp: ${TEMP_LABELS[garment.washTemp].split(" · ")[0]} → ${TEMP_LABELS[form.washTemp].split(" · ")[0]}`);
+    if (garment.fabricType !== form.fabricType) diffs.push(`Fabric: ${FABRIC_LABELS[garment.fabricType]} → ${FABRIC_LABELS[form.fabricType]}`);
+    if (garment.colorGroup !== form.colorGroup) diffs.push(`Color: ${COLOR_LABELS[garment.colorGroup]} → ${COLOR_LABELS[form.colorGroup]}`);
+    if (garment.isDelicate !== form.isDelicate) diffs.push(`Delicate: ${garment.isDelicate ? "On" : "Off"} → ${form.isDelicate ? "On" : "Off"}`);
+    if (garment.handWashOnly !== form.handWashOnly) diffs.push(`Hand wash: ${garment.handWashOnly ? "Required" : "Off"} → ${form.handWashOnly ? "Required" : "Off"}`);
+    if (garment.dryerSafe !== form.dryerSafe) diffs.push(`Dryer: ${garment.dryerSafe ? "Safe" : "Avoid"} → ${form.dryerSafe ? "Safe" : "Avoid"}`);
+    const prevSyms = garment.selectedSymbols ?? [];
+    const nextSyms = form.selectedSymbols ?? [];
+    const added = nextSyms.filter(s => !prevSyms.includes(s));
+    const removed = prevSyms.filter(s => !nextSyms.includes(s));
+    if (added.length > 0) diffs.push(`Symbols added: ${added.map(id => CARE_SYMBOLS.find(s => s.id === id)?.name ?? id).join(", ")}`);
+    if (removed.length > 0) diffs.push(`Symbols removed: ${removed.map(id => CARE_SYMBOLS.find(s => s.id === id)?.name ?? id).join(", ")}`);
+    return diffs;
+  }, [form, garment]);
+
+  const handleSave = () => {
+    if (!form.name.trim()) return;
+    onUpdate({ ...form });
+    setExpanded(false);
+  };
+
+  const handleDiscard = () => { setForm({ ...garment }); setExpanded(false); };
+
+  return (
+    <div className={`bg-card border rounded-2xl overflow-hidden transition-all duration-200 ${expanded ? "border-primary/40 shadow-md" : "border-border hover:border-primary/20"}`}>
+      {/* Summary row — click to expand */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setExpanded(e => !e)}
+        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(v => !v); } }}
+        className="w-full flex items-center gap-3 px-4 sm:px-5 py-3.5 sm:py-4 cursor-pointer select-none"
+        aria-expanded={expanded}
+        aria-label={`${expanded ? "Collapse" : "Expand"} ${garment.name}`}
+      >
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: COLOR_SWATCHES[garment.colorGroup] + "35" }}>
+          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLOR_SWATCHES[garment.colorGroup] }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-foreground text-sm truncate">{garment.name}</p>
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            <span className="text-xs text-muted-foreground font-mono">{FABRIC_LABELS[garment.fabricType]}</span>
+            <span className="text-xs text-muted-foreground">·</span>
+            <span className="text-xs font-mono" style={{ color: TEMP_COLORS[garment.washTemp] }}>{TEMP_LABELS[garment.washTemp]}</span>
+          </div>
+          <div className="flex gap-1 mt-1 flex-wrap items-center">
+            {garment.isDelicate && <Badge variant="amber">Delicate</Badge>}
+            {garment.handWashOnly && <Badge variant="amber">Hand Wash</Badge>}
+            {!garment.dryerSafe && <Badge>No Dryer</Badge>}
+            {(garment.selectedSymbols ?? []).length > 0 && (
+              <span className="flex items-center gap-0.5 ml-0.5">
+                {(garment.selectedSymbols ?? []).slice(0, 5).map(id => {
+                  const sym = CARE_SYMBOLS.find(s => s.id === id);
+                  return sym ? (
+                    <span key={id} title={sym.name} className="opacity-60">
+                      <SymbolSVG symbol={sym} size={14} />
+                    </span>
+                  ) : null;
+                })}
+                {(garment.selectedSymbols ?? []).length > 5 && (
+                  <span className="text-[10px] font-mono text-muted-foreground ml-0.5">+{(garment.selectedSymbols ?? []).length - 5}</span>
+                )}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-0.5 flex-shrink-0 items-center">
+          <button
+            onClick={e => { e.stopPropagation(); onToggleFavorite(garment.id); }}
+            aria-label={`${garment.isFavorite ? "Unmark" : "Mark"} ${garment.name} as regular`}
+            className={`p-2.5 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center ${garment.isFavorite ? "text-[#9B6E3A]" : "text-muted-foreground hover:text-[#9B6E3A]"}`}>
+            <Star size={14} className={garment.isFavorite ? "fill-[#9B6E3A]" : ""} />
+          </button>
+          <button
+            onClick={e => { e.stopPropagation(); onDelete(garment.id); }}
+            aria-label={`Delete ${garment.name}`}
+            className="p-2.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <Trash2 size={14} />
+          </button>
+          <span className={`ml-1 text-muted-foreground transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}>
+            <ChevronDown size={15} />
+          </span>
+        </div>
+      </div>
+
+      {/* Expanded edit panel */}
+      {expanded && (
+        <div className="border-t border-border px-4 sm:px-5 pt-5 pb-5 space-y-5">
+          {/* Name */}
+          <div>
+            <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-2">Garment Name</p>
+            <input
+              value={form.name}
+              onChange={e => set("name", e.target.value)}
+              placeholder="e.g. White Oxford Shirt"
+              className="w-full bg-secondary/50 border border-border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all min-h-[44px]"
+              style={{ fontFamily: "'DM Sans', sans-serif" }}
+            />
+          </div>
+
+          {/* Color Group */}
+          <div>
+            <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-2">Color Group</p>
+            <div className="grid grid-cols-2 gap-2">
+              {colorGroups.map(c => (
+                <button key={c} type="button" onClick={() => set("colorGroup", c)}
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border text-xs font-medium text-left transition-all duration-150 min-h-[44px]
+                    ${form.colorGroup === c ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-muted hover:text-foreground"}`}>
+                  <span className="w-3.5 h-3.5 rounded-full border border-border flex-shrink-0" style={{ backgroundColor: COLOR_SWATCHES[c] }} />
+                  <span className="leading-tight">{COLOR_LABELS[c]}</span>
+                  {form.colorGroup === c && <Check size={12} className="ml-auto flex-shrink-0" />}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Fabric Type */}
+          <div>
+            <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-2">Fabric Type</p>
+            <div className="flex flex-wrap gap-1.5">
+              {fabrics.map(f => (
+                <button key={f} type="button" onClick={() => set("fabricType", f)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150 min-h-[36px]
+                    ${form.fabricType === f ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"}`}>
+                  {FABRIC_LABELS[f]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Wash Temp */}
+          <div>
+            <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-2">Max Wash Temperature</p>
+            <div className="grid grid-cols-3 gap-2">
+              {temps.map(t => (
+                <button key={t} type="button" onClick={() => set("washTemp", t)}
+                  className={`py-2.5 px-2 rounded-lg border text-xs font-medium transition-all duration-150 min-h-[56px] flex flex-col items-center justify-center gap-1
+                    ${form.washTemp === t ? "border-primary bg-primary/5" : "border-border text-muted-foreground hover:border-muted hover:text-foreground"}`}>
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: TEMP_COLORS[t] }} />
+                  <span className={`text-center leading-tight ${form.washTemp === t ? "text-primary" : ""}`}>
+                    <span className="block">{t === "cold" ? "Cold" : t === "warm" ? "Warm" : "Hot"}</span>
+                    <span className="block font-mono opacity-70">{t === "cold" ? "30°C" : t === "warm" ? "40°C" : "60°C"}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Special Care */}
+          <div>
+            <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-1">Special Care</p>
+            <div className="divide-y divide-border">
+              <Toggle checked={form.isDelicate} onChange={v => set("isDelicate", v)} label="Delicate — handle with extra care" />
+              <Toggle checked={form.handWashOnly} onChange={v => set("handWashOnly", v)} label="Hand wash only" />
+              <Toggle checked={form.dryerSafe} onChange={v => set("dryerSafe", v)} label="Dryer safe" />
+            </div>
+          </div>
+
+          {/* Care Label Symbols */}
+          <InlineSymbolPicker
+            selected={form.selectedSymbols ?? []}
+            onChange={vals => set("selectedSymbols", vals)}
+          />
+
+          {/* Change summary */}
+          {hasChanges && changes.length > 0 && (
+            <div className="bg-amber-50 border border-[#B85C38]/20 rounded-xl px-4 py-3">
+              <p className="text-[10px] font-mono tracking-widest text-[#B85C38] uppercase mb-2">Unsaved Changes</p>
+              <ul className="space-y-1">
+                {changes.map((c, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs text-foreground">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#B85C38] flex-shrink-0 mt-1.5" />
+                    {c}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {!hasChanges && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Info size={12} className="flex-shrink-0" /> No changes yet — modify fields above to edit.
+            </p>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-2 pt-1">
+            <Btn onClick={handleDiscard} variant="secondary" size="sm" className="flex-shrink-0">Discard</Btn>
+            <Btn onClick={handleSave} variant="primary" size="sm" disabled={!form.name.trim() || !hasChanges} className="flex-1 justify-center">
+              <Check size={14} /> Save Changes
+            </Btn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Garment List View ────────────────────────────────────────────────────────
-function GarmentListView({ garments, onAdd, onEdit, onDelete, onGeneratePlan, onToggleFavorite }: {
-  garments: Garment[]; onAdd: () => void; onEdit: (g: Garment) => void; onDelete: (id: string) => void;
+function GarmentListView({ garments, onAdd, onUpdate, onEdit, onDelete, onGeneratePlan, onToggleFavorite }: {
+  garments: Garment[]; onAdd: () => void; onUpdate: (g: Garment) => void;
+  onEdit: (g: Garment) => void; onDelete: (id: string) => void;
   onGeneratePlan: () => void; onToggleFavorite: (id: string) => void;
 }) {
   return (
@@ -801,38 +1282,7 @@ function GarmentListView({ garments, onAdd, onEdit, onDelete, onGeneratePlan, on
         <>
           <div className="space-y-2.5 sm:space-y-3 mb-8 sm:mb-10">
             {garments.map(g => (
-              <div key={g.id} className="group flex items-center gap-3 sm:gap-4 bg-card border border-border rounded-xl px-4 sm:px-5 py-3.5 sm:py-4 hover:border-primary/20 transition-all duration-150">
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: COLOR_SWATCHES[g.colorGroup] + "35" }}>
-                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLOR_SWATCHES[g.colorGroup] }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground text-sm truncate">{g.name}</p>
-                  <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 flex-wrap">
-                    <span className="text-xs text-muted-foreground font-mono">{FABRIC_LABELS[g.fabricType]}</span>
-                    <span className="text-xs text-muted-foreground">·</span>
-                    <span className="text-xs font-mono" style={{ color: TEMP_COLORS[g.washTemp] }}>{TEMP_LABELS[g.washTemp]}</span>
-                  </div>
-                  <div className="flex gap-1 mt-1 flex-wrap">
-                    {g.isDelicate && <Badge variant="amber">Delicate</Badge>}
-                    {g.handWashOnly && <Badge variant="amber">Hand Wash</Badge>}
-                    {!g.dryerSafe && <Badge>No Dryer</Badge>}
-                  </div>
-                </div>
-                <div className="flex gap-1 flex-shrink-0">
-                  <button onClick={() => onToggleFavorite(g.id)} aria-label={`${g.isFavorite ? "Unmark" : "Mark"} ${g.name} as regular`}
-                    className={`p-2.5 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center ${g.isFavorite ? "text-[#9B6E3A]" : "text-muted-foreground hover:text-[#9B6E3A]"}`}>
-                    <Star size={14} className={g.isFavorite ? "fill-[#9B6E3A]" : ""} />
-                  </button>
-                  <button onClick={() => onEdit(g)} aria-label={`Edit ${g.name}`}
-                    className="p-2.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
-                    <Edit2 size={15} />
-                  </button>
-                  <button onClick={() => onDelete(g.id)} aria-label={`Delete ${g.name}`}
-                    className="p-2.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </div>
+              <GarmentRow key={g.id} garment={g} onUpdate={onUpdate} onDelete={onDelete} onToggleFavorite={onToggleFavorite} />
             ))}
           </div>
           <div className="bg-primary rounded-2xl p-5 sm:p-6">
@@ -1056,8 +1506,9 @@ function LaundryPlanView({ plan, mode, onBack, onRedo, onSave, isSaved }: {
 }
 
 // ─── Plan Saved View ──────────────────────────────────────────────────────────
-function PlanSavedView({ savedPlan, allSavedPlans, onNewPlan, onGoHome }: {
+function PlanSavedView({ savedPlan, allSavedPlans, onNewPlan, onGoHome, onViewPlan }: {
   savedPlan: SavedPlan; allSavedPlans: SavedPlan[]; onNewPlan: () => void; onGoHome: () => void;
+  onViewPlan: (plan: SavedPlan) => void;
 }) {
   return (
     <PageShell>
@@ -1067,15 +1518,16 @@ function PlanSavedView({ savedPlan, allSavedPlans, onNewPlan, onGoHome }: {
           <BookmarkCheck size={32} className="text-primary" />
         </div>
         <h1 className="text-2xl sm:text-3xl text-foreground mb-2" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 500 }}>Plan Saved</h1>
-        <p className="text-muted-foreground text-sm max-w-sm mx-auto">Your laundry plan has been saved and is ready to use whenever you need it.</p>
+        <p className="text-muted-foreground text-sm max-w-sm mx-auto">Your laundry plan has been saved. Tap the card below to view the full breakdown.</p>
       </div>
 
-      {/* Saved plan summary card */}
-      <div className="bg-card border border-primary/20 rounded-2xl p-5 mb-8 relative overflow-hidden">
+      {/* Saved plan summary card — tappable */}
+      <button onClick={() => onViewPlan(savedPlan)}
+        className="w-full text-left bg-card border border-primary/20 rounded-2xl p-5 mb-8 relative overflow-hidden hover:border-primary/40 hover:shadow-md transition-all duration-200 active:scale-[0.99] group">
         <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full translate-x-8 -translate-y-8" />
         <div className="flex items-start gap-3 relative">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0"><Bookmark size={18} className="text-primary" /></div>
-          <div>
+          <div className="flex-1 min-w-0">
             <p className="font-semibold text-foreground" style={{ fontFamily: "'Playfair Display', serif" }}>{savedPlan.name}</p>
             <p className="text-xs text-muted-foreground font-mono mt-0.5">{savedPlan.date}</p>
             <div className="flex gap-2 mt-2 flex-wrap">
@@ -1084,8 +1536,11 @@ function PlanSavedView({ savedPlan, allSavedPlans, onNewPlan, onGoHome }: {
               <Badge variant="teal">{MODE_LABELS[savedPlan.mode]}</Badge>
             </div>
           </div>
+          <span className="flex items-center gap-1 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 sm:opacity-100 transition-opacity flex-shrink-0">
+            View <ChevronRight size={13} />
+          </span>
         </div>
-      </div>
+      </button>
 
       {/* All saved plans */}
       {allSavedPlans.length > 1 && (
@@ -1093,7 +1548,8 @@ function PlanSavedView({ savedPlan, allSavedPlans, onNewPlan, onGoHome }: {
           <p className="text-xs font-mono tracking-widest text-muted-foreground uppercase mb-3">All Saved Plans</p>
           <div className="space-y-2">
             {allSavedPlans.map(plan => (
-              <div key={plan.id} className={`flex items-center gap-3 bg-card border rounded-xl px-4 py-3.5 ${plan.id === savedPlan.id ? "border-primary/30 bg-primary/3" : "border-border"}`}>
+              <button key={plan.id} onClick={() => onViewPlan(plan)}
+                className={`w-full flex items-center gap-3 bg-card border rounded-xl px-4 py-3.5 text-left hover:shadow-sm transition-all duration-150 active:scale-[0.99] ${plan.id === savedPlan.id ? "border-primary/30 bg-primary/3 hover:border-primary/50" : "border-border hover:border-primary/30"}`}>
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${plan.id === savedPlan.id ? "bg-primary/15" : "bg-secondary"}`}>
                   <Bookmark size={14} className={plan.id === savedPlan.id ? "text-primary" : "text-muted-foreground"} />
                 </div>
@@ -1101,8 +1557,11 @@ function PlanSavedView({ savedPlan, allSavedPlans, onNewPlan, onGoHome }: {
                   <p className="font-medium text-foreground text-sm truncate">{plan.name}</p>
                   <p className="text-xs text-muted-foreground font-mono">{plan.date} · {plan.loadCount} loads</p>
                 </div>
-                {plan.id === savedPlan.id && <Badge variant="teal">New</Badge>}
-              </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {plan.id === savedPlan.id && <Badge variant="teal">New</Badge>}
+                  <ChevronRight size={14} className="text-muted-foreground" />
+                </div>
+              </button>
             ))}
           </div>
         </div>
@@ -1289,6 +1748,293 @@ function DetectedSymbolsReview({ imageUrl, detectedSymbols, onConfirm, onCancel 
   );
 }
 
+// ─── Saved Plan Detail View ───────────────────────────────────────────────────
+function SavedPlanDetailView({ savedPlan, onBack, onNewPlan }: {
+  savedPlan: SavedPlan; onBack: () => void; onNewPlan: () => void;
+}) {
+  const { plan, mode } = savedPlan;
+  return (
+    <PageShell>
+      <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-5 transition-colors min-h-[44px]">
+        <ArrowLeft size={14} /> Back to Saved Plans
+      </button>
+
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 mb-6 sm:mb-8">
+        <div>
+          <p className="text-xs font-mono tracking-widest text-muted-foreground uppercase mb-1">Saved Plan</p>
+          <h1 className="text-2xl sm:text-3xl text-foreground" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 500 }}>{savedPlan.name}</h1>
+          <p className="text-xs text-muted-foreground font-mono mt-1">{savedPlan.date}</p>
+        </div>
+        <Badge variant="teal">{MODE_LABELS[mode]}</Badge>
+      </div>
+
+      {/* Stats bar */}
+      <div className="grid grid-cols-3 divide-x divide-border bg-card border border-border rounded-xl overflow-hidden mb-6 sm:mb-8">
+        {[
+          { label: "Loads", value: plan.loads.length, icon: <Layers size={15} /> },
+          { label: "Machine Wash", value: plan.loads.reduce((s, l) => s + l.garments.length, 0), icon: <WashingMachineIcon size={15} /> },
+          { label: "Hand Wash", value: plan.handWashItems.length, icon: <DropletIcon size={15} /> },
+        ].map((s, i) => (
+          <div key={i} className="flex flex-col items-center justify-center py-4 px-2 sm:px-4 gap-1">
+            <div className="text-primary">{s.icon}</div>
+            <p className="text-xl font-mono font-medium text-foreground">{s.value}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground text-center leading-tight">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Load cards */}
+      <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
+        {plan.loads.map((load, i) => (
+          <div key={load.id} className="bg-card border border-border rounded-2xl overflow-hidden">
+            <div className="px-4 sm:px-6 py-4 border-b border-border" style={{ borderLeftWidth: 4, borderLeftColor: load.color, borderLeftStyle: "solid" }}>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-xs font-mono text-muted-foreground">Load {i + 1}</span>
+                    <div className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                    <span className="text-xs font-mono font-medium" style={{ color: TEMP_COLORS[load.washTemp] }}>{TEMP_LABELS[load.washTemp]}</span>
+                  </div>
+                  <h3 className="font-semibold text-foreground text-sm sm:text-base" style={{ fontFamily: "'Playfair Display', serif" }}>{load.name}</h3>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="default">{load.cycle}</Badge>
+                  <span className="text-xs font-mono text-muted-foreground">{load.garments.length} items</span>
+                </div>
+              </div>
+            </div>
+            <div className="px-4 sm:px-6 py-4">
+              <div className="flex flex-wrap gap-2 mb-3">
+                {load.garments.map(g => (
+                  <div key={g.id} className="flex items-center gap-1.5 bg-secondary/60 rounded-lg px-2.5 py-1.5">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: COLOR_SWATCHES[g.colorGroup] }} />
+                    <span className="text-xs text-foreground font-medium">{g.name}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2.5 sm:gap-3 mb-3">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><ThermometerIcon size={13} /><span className="font-mono">{TEMP_LABELS[load.washTemp]}</span></div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><WashingMachineIcon size={13} /><span>{load.cycle}</span></div>
+                {load.garments.some(g => !g.dryerSafe) && <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Wind size={13} /><span>Air dry some items</span></div>}
+              </div>
+              {load.warnings.length > 0 && (
+                <div className="space-y-2">
+                  {load.warnings.map((w, j) => (
+                    <div key={j} className="flex items-start gap-2 bg-[#B85C38]/8 border border-[#B85C38]/15 rounded-lg px-3 py-2">
+                      <AlertTriangle size={13} className="text-accent flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-accent leading-relaxed">{w}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Hand wash section */}
+      {plan.handWashItems.length > 0 && (
+        <div className="bg-card border border-border rounded-2xl overflow-hidden mb-6 sm:mb-8">
+          <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-border" style={{ borderLeftWidth: 4, borderLeftColor: "#5B7FA6", borderLeftStyle: "solid" }}>
+            <DropletIcon size={18} className="text-[#5B7FA6] flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold text-foreground text-sm sm:text-base" style={{ fontFamily: "'Playfair Display', serif" }}>Hand Wash Separately</h3>
+              <p className="text-xs text-muted-foreground">{plan.handWashItems.length} items require hand washing</p>
+            </div>
+          </div>
+          <div className="px-4 sm:px-6 py-4">
+            <div className="flex flex-wrap gap-2 mb-3">
+              {plan.handWashItems.map(g => (
+                <div key={g.id} className="flex items-center gap-1.5 bg-[#5B7FA6]/10 rounded-lg px-2.5 py-1.5">
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COLOR_SWATCHES[g.colorGroup] }} />
+                  <span className="text-xs text-foreground font-medium">{g.name}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-start gap-2 bg-primary/5 border border-primary/15 rounded-lg px-3 py-2">
+              <Info size={13} className="text-primary flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-primary leading-relaxed">Gently hand wash each item in cool water with mild detergent. Do not wring — press and lay flat to dry.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-3 flex-wrap">
+        <Btn onClick={onBack} variant="secondary"><ArrowLeft size={15} /> All Plans</Btn>
+        <Btn onClick={onNewPlan} variant="primary" className="ml-auto"><Sparkles size={15} /> New Plan</Btn>
+      </div>
+    </PageShell>
+  );
+}
+
+// ─── Feedback View ───────────────────────────────────────────────────────────
+type FeedbackType = "general" | "bug" | "feature" | "other";
+type FeedbackRating = 1 | 2 | 3 | 4 | 5;
+
+function FeedbackView({ onBack }: { onBack: () => void }) {
+  const [submitted, setSubmitted] = useState(false);
+  const [form, setForm] = useState({
+    name: "", email: "", feedbackType: "general" as FeedbackType,
+    rating: 0 as number, message: "",
+  });
+  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
+    setForm(prev => ({ ...prev, [k]: v }));
+
+  const feedbackTypes: { id: FeedbackType; label: string; desc: string }[] = [
+    { id: "general", label: "General", desc: "Overall impressions" },
+    { id: "feature", label: "Feature Request", desc: "Something you'd love" },
+    { id: "bug", label: "Bug Report", desc: "Something went wrong" },
+    { id: "other", label: "Other", desc: "Anything else" },
+  ];
+
+  const ratingLabels: Record<number, string> = {
+    1: "Poor", 2: "Fair", 3: "Good", 4: "Great", 5: "Excellent",
+  };
+
+  const handleSubmit = () => {
+    if (!form.message.trim()) return;
+    setSubmitted(true);
+  };
+
+  if (submitted) {
+    return (
+      <PageShell>
+        <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors min-h-[44px]">
+          <ArrowLeft size={14} /> Back to Home
+        </button>
+        <div className="max-w-md mx-auto text-center py-12">
+          <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-5">
+            <SmilePlus size={30} className="text-accent" />
+          </div>
+          <h1 className="text-2xl sm:text-3xl text-foreground mb-3" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 500 }}>
+            Thank you, {form.name || "friend"}!
+          </h1>
+          <p className="text-muted-foreground text-sm leading-relaxed mb-8">
+            Your feedback helps make ThreadCare better for everyone. We read every submission and genuinely appreciate you taking the time.
+          </p>
+          <div className="bg-card border border-border rounded-2xl p-5 text-left mb-8">
+            <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-3">Your Submission</p>
+            <div className="space-y-2.5">
+              <div className="flex items-start gap-3">
+                <span className="text-xs text-muted-foreground w-20 flex-shrink-0 pt-0.5">Type</span>
+                <span className="text-xs text-foreground font-medium capitalize">{feedbackTypes.find(f => f.id === form.feedbackType)?.label}</span>
+              </div>
+              {form.rating > 0 && (
+                <div className="flex items-start gap-3">
+                  <span className="text-xs text-muted-foreground w-20 flex-shrink-0 pt-0.5">Rating</span>
+                  <span className="text-xs text-foreground font-medium">{"★".repeat(form.rating)}{"☆".repeat(5 - form.rating)} · {ratingLabels[form.rating]}</span>
+                </div>
+              )}
+              <div className="flex items-start gap-3">
+                <span className="text-xs text-muted-foreground w-20 flex-shrink-0 pt-0.5">Message</span>
+                <span className="text-xs text-foreground leading-relaxed">{form.message}</span>
+              </div>
+            </div>
+          </div>
+          <Btn onClick={onBack} variant="primary" className="w-full justify-center"><Home size={16} /> Back to Home</Btn>
+        </div>
+      </PageShell>
+    );
+  }
+
+  return (
+    <PageShell>
+      <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors min-h-[44px]">
+        <ArrowLeft size={14} /> Back to Home
+      </button>
+
+      <div className="max-w-2xl">
+        <div className="mb-7 sm:mb-9">
+          <p className="text-xs font-mono tracking-widest text-muted-foreground uppercase mb-2">Feedback</p>
+          <h1 className="text-2xl sm:text-3xl text-foreground mb-1" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 500 }}>
+            Share Your Thoughts
+          </h1>
+          <p className="text-sm text-muted-foreground leading-relaxed">Your feedback shapes the future of ThreadCare. We read every message.</p>
+        </div>
+
+        <div className="space-y-4 sm:space-y-5">
+          {/* Personal info */}
+          <div className="bg-card border border-border rounded-2xl p-5">
+            <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-4">Your Information <span className="text-muted-foreground/50 normal-case font-sans tracking-normal">(optional)</span></p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="fb-name" className="block text-xs text-muted-foreground mb-1.5">Name</label>
+                <input id="fb-name" value={form.name} onChange={e => set("name", e.target.value)}
+                  placeholder="Your name"
+                  className="w-full bg-secondary/50 border border-border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all min-h-[44px]"
+                  style={{ fontFamily: "'DM Sans', sans-serif" }} />
+              </div>
+              <div>
+                <label htmlFor="fb-email" className="block text-xs text-muted-foreground mb-1.5">Email</label>
+                <input id="fb-email" type="email" value={form.email} onChange={e => set("email", e.target.value)}
+                  placeholder="your@email.com"
+                  className="w-full bg-secondary/50 border border-border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all min-h-[44px]"
+                  style={{ fontFamily: "'DM Sans', sans-serif" }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Feedback type */}
+          <div className="bg-card border border-border rounded-2xl p-5">
+            <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-4">Feedback Type</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {feedbackTypes.map(t => (
+                <button key={t.id} type="button" onClick={() => set("feedbackType", t.id)}
+                  className={`flex flex-col items-start px-3.5 py-3 rounded-xl border text-left transition-all duration-150 min-h-[68px]
+                    ${form.feedbackType === t.id ? "border-accent/50 bg-accent/8 text-accent" : "border-border text-muted-foreground hover:border-muted hover:text-foreground"}`}>
+                  <span className="text-sm font-medium leading-snug">{t.label}</span>
+                  <span className="text-[10px] mt-0.5 opacity-70">{t.desc}</span>
+                  {form.feedbackType === t.id && <Check size={11} className="mt-auto ml-auto" />}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Star rating */}
+          <div className="bg-card border border-border rounded-2xl p-5">
+            <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-4">
+              Overall Rating <span className="text-muted-foreground/50 normal-case font-sans tracking-normal">(optional)</span>
+            </p>
+            <div className="flex items-center gap-2">
+              {[1, 2, 3, 4, 5].map(n => (
+                <button key={n} type="button" onClick={() => set("rating", form.rating === n ? 0 : n)}
+                  className={`text-2xl transition-all duration-100 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:scale-110 active:scale-95
+                    ${n <= form.rating ? "text-[#9B6E3A]" : "text-muted-foreground/30 hover:text-muted-foreground/60"}`}>
+                  ★
+                </button>
+              ))}
+              {form.rating > 0 && (
+                <span className="text-sm text-muted-foreground ml-2 font-medium">{ratingLabels[form.rating]}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Message */}
+          <div className="bg-card border border-border rounded-2xl p-5">
+            <label htmlFor="fb-message" className="block text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-4">
+              Your Feedback <span className="text-accent/60 normal-case font-sans tracking-normal">*</span>
+            </label>
+            <textarea id="fb-message" value={form.message} onChange={e => set("message", e.target.value)}
+              placeholder="Tell us what you think, what you'd improve, or anything on your mind…"
+              rows={5}
+              className="w-full bg-secondary/50 border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all resize-none leading-relaxed"
+              style={{ fontFamily: "'DM Sans', sans-serif" }} />
+            <p className="text-[10px] text-muted-foreground mt-2 text-right font-mono">{form.message.length} characters</p>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6 sm:mt-7">
+          <Btn onClick={onBack} variant="secondary" className="flex-shrink-0">Cancel</Btn>
+          <Btn onClick={handleSubmit} variant="primary" disabled={!form.message.trim()} className="flex-1 justify-center">
+            <Send size={15} /> Submit Feedback
+          </Btn>
+        </div>
+      </div>
+    </PageShell>
+  );
+}
+
 // ─── App Root ────────────────────────────────────────────────────────────────
 export default function App() {
   const [mainView, setMainView] = useState<MainView>("home");
@@ -1304,6 +2050,7 @@ export default function App() {
   // New state for added features
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
   const [currentSavedPlan, setCurrentSavedPlan] = useState<SavedPlan | null>(null);
+  const [viewingPlan, setViewingPlan] = useState<SavedPlan | null>(null);
   const [isPlanSaved, setIsPlanSaved] = useState(false);
   const [showSaveSheet, setShowSaveSheet] = useState(false);
   const [tagImageUrl, setTagImageUrl] = useState<string | null>(null);
@@ -1315,7 +2062,7 @@ export default function App() {
     setMainView(v);
     if (v === "wardrobe") setWardrobeSubview("list");
     if (v === "symbols") setSymbolsSubview("guide");
-    if (v === "plan") { setPlanSubview("priority"); setIsPlanSaved(false); }
+    if (v === "plan") { setPlanSubview("saved"); setIsPlanSaved(false); setCurrentSavedPlan(null); setViewingPlan(null); }
   };
 
   const handleSelectSymbol = (s: CareSymbol) => { setSelectedSymbol(s); setSymbolsSubview("detail"); };
@@ -1326,6 +2073,7 @@ export default function App() {
     setWardrobeSubview("list");
   };
   const handleDeleteGarment = (id: string) => setGarments(prev => prev.filter(g => g.id !== id));
+  const handleUpdateGarment = (g: Garment) => setGarments(prev => prev.map(x => x.id === g.id ? g : x));
   const handleToggleFavorite = (id: string) => setGarments(prev => prev.map(g => g.id === id ? { ...g, isFavorite: !g.isFavorite } : g));
 
   const handleGeneratePlan = () => {
@@ -1343,6 +2091,7 @@ export default function App() {
       mode: priorityMode,
       loadCount: laundryPlan.loads.length,
       garmentCount: garments.length,
+      plan: laundryPlan,
     };
     setSavedPlans(prev => [plan, ...prev]);
     setCurrentSavedPlan(plan);
@@ -1350,6 +2099,8 @@ export default function App() {
     setShowSaveSheet(false);
     setPlanSubview("saved");
   };
+
+  const handleViewPlan = (plan: SavedPlan) => { setViewingPlan(plan); setPlanSubview("saved-detail"); };
 
   // Tag upload + mock analysis flow
   const handleScanTag = () => { setTagImageUrl(null); setDetectedSymbols(null); setWardrobeSubview("tag-upload"); };
@@ -1374,7 +2125,7 @@ export default function App() {
       <NavBar view={mainView} onNav={navigate} garmentCount={garments.length} />
 
       {mainView === "home" && (
-        <HomeView garmentCount={garments.length} onNav={navigate} savedPlans={savedPlans} onViewSaved={() => { setMainView("plan"); setPlanSubview("saved"); }} />
+        <HomeView garmentCount={garments.length} onNav={navigate} savedPlans={savedPlans} onViewSaved={() => { setMainView("plan"); setPlanSubview("saved"); }} onViewPlan={plan => { setViewingPlan(plan); setMainView("plan"); setPlanSubview("saved-detail"); }} />
       )}
 
       {mainView === "symbols" && (
@@ -1385,7 +2136,7 @@ export default function App() {
 
       {mainView === "wardrobe" && (
         wardrobeSubview === "list" ? (
-          <GarmentListView garments={garments} onAdd={handleAddGarment} onEdit={handleEditGarment} onDelete={handleDeleteGarment} onGeneratePlan={handleGoToPlan} onToggleFavorite={handleToggleFavorite} />
+          <GarmentListView garments={garments} onAdd={handleAddGarment} onUpdate={handleUpdateGarment} onEdit={handleEditGarment} onDelete={handleDeleteGarment} onGeneratePlan={handleGoToPlan} onToggleFavorite={handleToggleFavorite} />
         ) : wardrobeSubview === "form" ? (
           <GarmentForm editing={editingGarment} onSave={handleSaveGarment} onCancel={() => setWardrobeSubview("list")} onScanTag={handleScanTag} scannedSymbols={scannedSymbols} />
         ) : wardrobeSubview === "tag-upload" ? (
@@ -1414,32 +2165,63 @@ export default function App() {
             <SavePlanSheet isOpen={showSaveSheet} plan={laundryPlan} mode={priorityMode} onSave={handleSavePlan} onClose={() => setShowSaveSheet(false)} />
           </>
         ) : planSubview === "saved" && currentSavedPlan ? (
-          <PlanSavedView savedPlan={currentSavedPlan} allSavedPlans={savedPlans} onNewPlan={() => { setPlanSubview("priority"); setIsPlanSaved(false); }} onGoHome={() => navigate("home")} />
+          <PlanSavedView savedPlan={currentSavedPlan} allSavedPlans={savedPlans} onNewPlan={() => navigate("wardrobe")} onGoHome={() => navigate("home")} onViewPlan={handleViewPlan} />
         ) : planSubview === "saved" ? (
           <PageShell>
-            <SectionHeader eyebrow="Plans" title="Saved Plans" subtitle="Your previously saved laundry plans." />
+            <SectionHeader eyebrow="Plans" title="Laundry Plans" subtitle="View your saved plans or start a new one." />
+
+            {/* Create New Plan CTA */}
+            <button onClick={() => navigate("wardrobe")}
+              className="w-full flex items-center gap-4 bg-primary text-primary-foreground rounded-2xl px-5 py-4 mb-6 text-left hover:bg-primary/90 active:scale-[0.99] transition-all duration-150 group">
+              <div className="w-10 h-10 rounded-xl bg-primary-foreground/15 flex items-center justify-center flex-shrink-0">
+                <Plus size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-primary-foreground" style={{ fontFamily: "'Playfair Display', serif" }}>Create New Plan</p>
+                <p className="text-xs text-primary-foreground/70 mt-0.5">Review your wardrobe, then generate optimized loads</p>
+              </div>
+              <ChevronRight size={16} className="text-primary-foreground/60 group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
+            </button>
+
             {savedPlans.length === 0 ? (
-              <div className="text-center py-16 text-muted-foreground">
-                <Bookmark size={40} className="mx-auto mb-3 opacity-30" />
-                <p className="mb-4">No plans saved yet.</p>
-                <Btn onClick={() => setPlanSubview("priority")} variant="primary"><Sparkles size={16} /> Create a Plan</Btn>
+              <div className="text-center py-14 text-muted-foreground">
+                <Bookmark size={36} className="mx-auto mb-3 opacity-25" />
+                <p className="font-medium text-foreground mb-1">No saved plans yet</p>
+                <p className="text-sm">Plans you create and save will appear here.</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {savedPlans.map(plan => (
-                  <div key={plan.id} className="flex items-center gap-3 bg-card border border-border rounded-xl px-5 py-4">
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0"><Bookmark size={15} className="text-primary" /></div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground text-sm">{plan.name}</p>
-                      <p className="text-xs text-muted-foreground font-mono">{plan.date} · {plan.loadCount} loads · {plan.garmentCount} items</p>
-                    </div>
-                    <Badge variant="teal">{MODE_LABELS[plan.mode].split(" ")[0]}</Badge>
-                  </div>
-                ))}
-              </div>
+              <>
+                <p className="text-xs font-mono tracking-widest text-muted-foreground uppercase mb-3">Previous Plans</p>
+                <div className="space-y-2.5">
+                  {savedPlans.map(plan => (
+                    <button key={plan.id} onClick={() => handleViewPlan(plan)}
+                      className="w-full flex items-center gap-3 bg-card border border-border rounded-xl px-5 py-4 text-left hover:border-primary/30 hover:shadow-sm transition-all duration-150 active:scale-[0.99]">
+                      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0"><Bookmark size={15} className="text-primary" /></div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground text-sm">{plan.name}</p>
+                        <p className="text-xs text-muted-foreground font-mono">{plan.date} · {plan.loadCount} loads · {plan.garmentCount} items</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge variant="teal">{MODE_LABELS[plan.mode].split(" ")[0]}</Badge>
+                        <ChevronRight size={14} className="text-muted-foreground" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </PageShell>
+        ) : planSubview === "saved-detail" && viewingPlan ? (
+          <SavedPlanDetailView
+            savedPlan={viewingPlan}
+            onBack={() => { setViewingPlan(null); setPlanSubview(currentSavedPlan ? "saved" : "saved"); }}
+            onNewPlan={() => { setViewingPlan(null); navigate("wardrobe"); }}
+          />
         ) : null
+      )}
+
+      {mainView === "feedback" && (
+        <FeedbackView onBack={() => navigate("home")} />
       )}
     </div>
   );
