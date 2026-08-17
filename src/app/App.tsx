@@ -6,11 +6,12 @@ import {
   ThermometerIcon, Check, X, Info, WashingMachineIcon,
   Camera, Upload, Star, BookmarkCheck, Tag, User, Cpu,
   SlidersHorizontal, ChevronDown, ChevronUp, Clock,
-  Bookmark, RefreshCw, ImageIcon, Zap, MessageSquare, Send, SmilePlus
+  Bookmark, RefreshCw, ImageIcon, Zap, MessageSquare, Send, SmilePlus,
+  Moon, Sun
 } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-type MainView = "home" | "symbols" | "wardrobe" | "plan" | "feedback";
+type MainView = "home" | "symbols" | "wardrobe" | "plan" | "feedback" | "about";
 type SymbolsSubview = "guide" | "detail";
 type WardrobeSubview = "list" | "form" | "tag-upload" | "symbol-review" | "frequent";
 type PlanSubview = "priority" | "results" | "saved" | "saved-detail";
@@ -202,7 +203,10 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 }
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
-function NavBar({ view, onNav, garmentCount }: { view: MainView; onNav: (v: MainView) => void; garmentCount: number }) {
+function NavBar({ view, onNav, garmentCount, darkMode, onToggleDark }: {
+  view: MainView; onNav: (v: MainView) => void; garmentCount: number;
+  darkMode: boolean; onToggleDark: () => void;
+}) {
   const navItems: { id: MainView; icon: React.ReactNode; label: string }[] = [
     { id: "home", icon: <Home size={20} />, label: "Home" },
     { id: "symbols", icon: <BookOpen size={20} />, label: "Symbols" },
@@ -225,6 +229,10 @@ function NavBar({ view, onNav, garmentCount }: { view: MainView; onNav: (v: Main
                 )}
               </button>
             ))}
+            <button onClick={onToggleDark} aria-label={darkMode ? "Switch to light mode" : "Switch to night mode"}
+              className="ml-1 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center">
+              {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
           </nav>
         </div>
       </header>
@@ -240,6 +248,12 @@ function NavBar({ view, onNav, garmentCount }: { view: MainView; onNav: (v: Main
             )}
           </button>
         ))}
+        {/* Dark mode toggle as 5th tab on mobile */}
+        <button onClick={onToggleDark} aria-label={darkMode ? "Switch to light mode" : "Switch to night mode"}
+          className="flex-1 flex flex-col items-center justify-center gap-1 py-2 transition-colors duration-150 min-h-[56px] text-muted-foreground">
+          {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+          <span className="text-[10px] font-medium leading-none">{darkMode ? "Light" : "Night"}</span>
+        </button>
       </nav>
     </>
   );
@@ -348,51 +362,53 @@ function HomeView({ garmentCount, onNav, savedPlans, onViewSaved, onViewPlan }: 
       </div>
 
       {/* Future Features teasers + Feedback */}
-      <div className="grid sm:grid-cols-3 gap-3">
-        <div className="sm:col-span-2">
-          <p className="text-xs font-mono tracking-widest text-muted-foreground uppercase mb-3">Coming Soon</p>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="relative bg-card border border-border rounded-xl p-5 overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-[#5B7FA6]/5 rounded-full -translate-y-8 translate-x-8" />
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-lg bg-[#5B7FA6]/10 flex items-center justify-center flex-shrink-0"><Cpu size={18} className="text-[#5B7FA6]" /></div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1"><span className="font-semibold text-foreground text-sm" style={{ fontFamily: "'Playfair Display', serif" }}>Auto Symbol Recognition</span><Badge variant="future">Soon</Badge></div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">Point your camera at a care label — ThreadCare will identify all symbols instantly using on-device computer vision.</p>
-                </div>
-              </div>
-            </div>
-            <div className="relative bg-card border border-border rounded-xl p-5 overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-8 translate-x-8" />
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0"><User size={18} className="text-primary" /></div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1"><span className="font-semibold text-foreground text-sm" style={{ fontFamily: "'Playfair Display', serif" }}>User Accounts</span><Badge variant="future">Soon</Badge></div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">Sync your wardrobe and saved plans across devices. Share laundry settings with household members.</p>
-                </div>
+      <div className="mb-1">
+        <p className="text-xs font-mono tracking-widest text-muted-foreground uppercase mb-3">Coming Soon</p>
+        <div className="grid sm:grid-cols-3 gap-3">
+          <div className="relative bg-card border border-border rounded-xl p-5 overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-[#5B7FA6]/5 rounded-full -translate-y-8 translate-x-8" />
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-[#5B7FA6]/10 flex items-center justify-center flex-shrink-0"><Cpu size={18} className="text-[#5B7FA6]" /></div>
+              <div>
+                <div className="flex items-center gap-2 mb-1"><span className="font-semibold text-foreground text-sm" style={{ fontFamily: "'Playfair Display', serif" }}>Auto Symbol Recognition</span><Badge variant="future">Soon</Badge></div>
+                <p className="text-xs text-muted-foreground leading-relaxed">Point your camera at a care label — ThreadCare will identify all symbols instantly using on-device computer vision.</p>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Feedback entry */}
-        <div className="flex flex-col">
-          <p className="text-xs font-mono tracking-widest text-muted-foreground uppercase mb-3">Your Voice</p>
-          <button onClick={() => onNav("feedback")}
-            className="flex-1 relative bg-accent/8 border border-accent/20 rounded-xl p-5 text-left hover:bg-accent/12 hover:border-accent/35 active:scale-[0.99] transition-all duration-150 overflow-hidden group">
-            <div className="absolute bottom-0 right-0 w-28 h-28 bg-accent/8 rounded-full translate-x-8 translate-y-8" />
-            <div className="relative">
-              <div className="w-9 h-9 rounded-lg bg-accent/15 flex items-center justify-center mb-3">
-                <MessageSquare size={18} className="text-accent" />
+          <div className="relative bg-card border border-border rounded-xl p-5 overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-8 translate-x-8" />
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0"><User size={18} className="text-primary" /></div>
+              <div>
+                <div className="flex items-center gap-2 mb-1"><span className="font-semibold text-foreground text-sm" style={{ fontFamily: "'Playfair Display', serif" }}>User Accounts</span><Badge variant="future">Soon</Badge></div>
+                <p className="text-xs text-muted-foreground leading-relaxed">Sync your wardrobe and saved plans across devices. Share laundry settings with household members.</p>
               </div>
-              <p className="font-semibold text-foreground text-sm mb-1" style={{ fontFamily: "'Playfair Display', serif" }}>Share Feedback</p>
-              <p className="text-xs text-muted-foreground leading-relaxed mb-4">Help shape ThreadCare. Tell us what works, what's missing, and what you'd love to see next.</p>
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-accent group-hover:gap-2 transition-all">
-                Leave feedback <ChevronRight size={12} />
-              </span>
+            </div>
+          </div>
+          <button onClick={() => onNav("feedback")}
+            className="relative bg-accent/8 border border-accent/20 rounded-xl p-5 text-left hover:bg-accent/12 hover:border-accent/35 active:scale-[0.99] transition-all duration-150 overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-accent/5 rounded-full -translate-y-8 translate-x-8" />
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-accent/15 flex items-center justify-center flex-shrink-0"><MessageSquare size={18} className="text-accent" /></div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-semibold text-foreground text-sm" style={{ fontFamily: "'Playfair Display', serif" }}>Share Feedback</span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">Help shape ThreadCare. Tell us what works, what's missing, and what you'd love to see next.</p>
+              </div>
             </div>
           </button>
         </div>
+      </div>
+
+      {/* Footer */}
+      <div className="mt-10 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground font-mono">© 2026 ThreadCare · All rights reserved</p>
+        <button onClick={() => onNav("about")}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors min-h-[36px]">
+          <Info size={12} />
+          About ThreadCare
+        </button>
       </div>
     </PageShell>
   );
@@ -583,14 +599,14 @@ function SymbolDetailView({ symbol, onBack }: { symbol: CareSymbol; onBack: () =
 // ─── Garment Entry Form (with edit change summary + scan tag entry) ───────────
 // ─── SymbolPicker ─────────────────────────────────────────────────────────────
 function SymbolPicker({ selected, onChange }: { selected: string[]; onChange: (ids: string[]) => void }) {
-  const categories = ["washing", "drying", "ironing", "bleaching", "professional"] as const;
-  const [activeCategory, setActiveCategory] = useState<typeof categories[number]>("washing");
+  const categories = ["all", "washing", "drying", "ironing", "bleaching", "professional"] as const;
+  const [activeCategory, setActiveCategory] = useState<typeof categories[number]>("all");
 
   const toggle = (id: string) => {
     onChange(selected.includes(id) ? selected.filter(s => s !== id) : [...selected, id]);
   };
 
-  const categorySymbols = CARE_SYMBOLS.filter(s => s.category === activeCategory);
+  const categorySymbols = activeCategory === "all" ? CARE_SYMBOLS : CARE_SYMBOLS.filter(s => s.category === activeCategory);
   const selectedSet = new Set(selected);
 
   return (
@@ -628,7 +644,7 @@ function SymbolPicker({ selected, onChange }: { selected: string[]; onChange: (i
       {/* Category tabs */}
       <div className="flex gap-1.5 mb-4 overflow-x-auto pb-0.5 scrollbar-hide -mx-1 px-1">
         {categories.map(cat => {
-          const count = CARE_SYMBOLS.filter(s => s.category === cat && selectedSet.has(s.id)).length;
+          const count = cat === "all" ? selected.length : CARE_SYMBOLS.filter(s => s.category === cat && selectedSet.has(s.id)).length;
           return (
             <button key={cat} type="button" onClick={() => setActiveCategory(cat)}
               className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150 min-h-[32px]
@@ -685,6 +701,7 @@ function SymbolPicker({ selected, onChange }: { selected: string[]; onChange: (i
 const EMPTY_FORM = { name: "", colorGroup: "white" as ColorGroup, fabricType: "cotton" as FabricType, washTemp: "cold" as WashTemp, isDelicate: false, handWashOnly: false, dryerSafe: true, selectedSymbols: [] as string[] };
 
 const SYMBOL_CATEGORY_LABELS: Record<string, string> = {
+  all: "All",
   washing: "Washing",
   drying: "Drying",
   ironing: "Ironing",
@@ -926,15 +943,15 @@ function FrequentItemsSection({ garments, onEdit }: { garments: Garment[]; onEdi
 
 // ─── Inline Symbol Picker (compact, for GarmentRow panels) ──────────────────
 function InlineSymbolPicker({ selected, onChange }: { selected: string[]; onChange: (ids: string[]) => void }) {
-  const categories = ["washing", "drying", "ironing", "bleaching", "professional"] as const;
-  const [activeCategory, setActiveCategory] = useState<typeof categories[number]>("washing");
+  const categories = ["all", "washing", "drying", "ironing", "bleaching", "professional"] as const;
+  const [activeCategory, setActiveCategory] = useState<typeof categories[number]>("all");
   const selectedSet = new Set(selected);
 
   const toggle = (id: string) => {
     onChange(selected.includes(id) ? selected.filter(s => s !== id) : [...selected, id]);
   };
 
-  const categorySymbols = CARE_SYMBOLS.filter(s => s.category === activeCategory);
+  const categorySymbols = activeCategory === "all" ? CARE_SYMBOLS : CARE_SYMBOLS.filter(s => s.category === activeCategory);
 
   return (
     <div>
@@ -969,7 +986,9 @@ function InlineSymbolPicker({ selected, onChange }: { selected: string[]; onChan
       {/* Category tabs */}
       <div className="flex gap-1 mb-3 overflow-x-auto pb-0.5 -mx-0.5 px-0.5">
         {categories.map(cat => {
-          const count = CARE_SYMBOLS.filter(s => s.category === cat && selectedSet.has(s.id)).length;
+          const count = cat === "all"
+            ? selected.length
+            : CARE_SYMBOLS.filter(s => s.category === cat && selectedSet.has(s.id)).length;
           return (
             <button key={cat} type="button" onClick={() => setActiveCategory(cat)}
               className={`flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all min-h-[28px]
@@ -1868,6 +1887,213 @@ function SavedPlanDetailView({ savedPlan, onBack, onNewPlan }: {
   );
 }
 
+// ─── About View ──────────────────────────────────────────────────────────────
+function AboutView({ onBack, onNav }: { onBack: () => void; onNav: (v: MainView) => void }) {
+  const features = [
+    {
+      icon: <Shirt size={20} />,
+      title: "Smart Wardrobe",
+      desc: "Store every garment's care requirements — fabric, wash temperature, and special instructions — in one place.",
+      color: "bg-[#5B7FA6]/10 text-[#5B7FA6]",
+    },
+    {
+      icon: <Sparkles size={20} />,
+      title: "Laundry Planning",
+      desc: "Generate optimized laundry loads from your wardrobe. Three modes let you prioritize care, convenience, or fewer loads.",
+      color: "bg-primary/10 text-primary",
+    },
+    {
+      icon: <BookOpen size={20} />,
+      title: "Symbol Guide",
+      desc: "An illustrated reference for all 20 ISO laundry care symbols across washing, drying, ironing, bleaching, and professional care.",
+      color: "bg-[#8B5E3C]/10 text-[#8B5E3C]",
+    },
+    {
+      icon: <Camera size={20} />,
+      title: "Care Tag Scanner",
+      desc: "Photograph a garment's care label and let ThreadCare read the symbols for you, pre-filling the form automatically.",
+      color: "bg-accent/10 text-accent",
+    },
+    {
+      icon: <Tag size={20} />,
+      title: "Care Symbol Picker",
+      desc: "Manually attach specific care symbols to any garment, giving you a precise record of exactly what's on the label.",
+      color: "bg-[#6B5B95]/10 text-[#6B5B95]",
+    },
+    {
+      icon: <Star size={20} />,
+      title: "Your Regulars",
+      desc: "Star your most-washed items for quick access. Frequent garments stay pinned at the top of your wardrobe list.",
+      color: "bg-[#9B6E3A]/10 text-[#9B6E3A]",
+    },
+  ];
+
+  const symbolCategories = [
+    { name: "Washing", count: CARE_SYMBOLS.filter(s => s.category === "washing").length, color: "#4A7FA0", desc: "Machine wash temperatures, hand wash, do-not-wash" },
+    { name: "Drying", count: CARE_SYMBOLS.filter(s => s.category === "drying").length, color: "#2E5C50", desc: "Tumble dry settings, flat dry, line dry, no-tumble" },
+    { name: "Ironing", count: CARE_SYMBOLS.filter(s => s.category === "ironing").length, color: "#8B5E3C", desc: "Iron temperature levels and do-not-iron" },
+    { name: "Bleaching", count: CARE_SYMBOLS.filter(s => s.category === "bleaching").length, color: "#9B6E3A", desc: "Any bleach, non-chlorine bleach, do-not-bleach" },
+    { name: "Professional", count: CARE_SYMBOLS.filter(s => s.category === "professional").length, color: "#6B5B95", desc: "Dry clean, no dry clean, wet clean" },
+  ];
+
+  const planModes = [
+    { name: "Maximum Protection", desc: "Groups by wash temp and colour — the safest possible loads for delicate items.", color: "#4A7FA0" },
+    { name: "Balanced", desc: "Groups by temperature only. Fewer loads than max protection, still careful with fabrics.", color: "#2E5C50" },
+    { name: "Minimize Loads", desc: "Combines everything at the lowest safe temperature. Best for laundry day efficiency.", color: "#8B5E3C" },
+  ];
+
+  return (
+    <PageShell>
+      <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors min-h-[44px]">
+        <ArrowLeft size={14} /> Back to Home
+      </button>
+
+      {/* Hero */}
+      <div className="relative bg-primary rounded-2xl px-6 py-10 sm:py-14 mb-8 overflow-hidden">
+        <div className="absolute inset-0 opacity-10" style={{
+          backgroundImage: "radial-gradient(circle at 20% 50%, #fff 0%, transparent 50%), radial-gradient(circle at 80% 20%, #fff 0%, transparent 40%)"
+        }} />
+        <div className="relative max-w-xl">
+          <p className="text-xs font-mono tracking-widest text-primary-foreground/60 uppercase mb-3">About</p>
+          <h1 className="text-3xl sm:text-4xl text-primary-foreground mb-4" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 500 }}>
+            ThreadCare
+          </h1>
+          <p className="text-primary-foreground/80 text-sm sm:text-base leading-relaxed max-w-sm">
+            A thoughtful laundry companion that helps you understand what's on your clothing labels, organise your wardrobe by care requirements, and plan every wash with confidence.
+          </p>
+          <div className="flex flex-wrap gap-2 mt-6">
+            {[
+              { label: `${CARE_SYMBOLS.length} Symbols`, nav: "symbols" as MainView },
+              { label: "3 Plan Modes", nav: "plan" as MainView },
+            ].map(({ label, nav }) => (
+              <button key={label} onClick={() => onNav(nav)}
+                className="flex items-center gap-1.5 text-xs font-medium text-primary-foreground bg-primary-foreground/15 hover:bg-primary-foreground/25 border border-primary-foreground/20 px-3 py-1.5 rounded-full transition-all min-h-[32px]">
+                {label} <ChevronRight size={11} />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* By the numbers */}
+      <div className="mb-8">
+        <p className="text-xs font-mono tracking-widest text-muted-foreground uppercase mb-4">By the Numbers</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { value: CARE_SYMBOLS.length, label: "Care Symbols", sub: "ISO laundry standard" },
+            { value: 5, label: "Symbol Categories", sub: "Wash · Dry · Iron · Bleach · Pro" },
+            { value: 3, label: "Plan Modes", sub: "Protection to efficiency" },
+            { value: 7, label: "Fabric Types", sub: "Cotton to silk & beyond" },
+          ].map(({ value, label, sub }) => (
+            <div key={label} className="bg-card border border-border rounded-xl px-4 py-4 text-center">
+              <p className="text-2xl sm:text-3xl font-semibold text-primary mb-1" style={{ fontFamily: "'Playfair Display', serif" }}>{value}</p>
+              <p className="text-xs font-medium text-foreground leading-snug">{label}</p>
+              <p className="text-[10px] text-muted-foreground font-mono mt-0.5 leading-snug">{sub}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Core features */}
+      <div className="mb-8">
+        <p className="text-xs font-mono tracking-widest text-muted-foreground uppercase mb-4">Core Features</p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {features.map(f => (
+            <div key={f.title} className="bg-card border border-border rounded-xl p-4 flex gap-3">
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${f.color}`}>{f.icon}</div>
+              <div>
+                <p className="font-semibold text-foreground text-sm mb-1" style={{ fontFamily: "'Playfair Display', serif" }}>{f.title}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Symbol categories */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-xs font-mono tracking-widest text-muted-foreground uppercase">Care Symbol Reference</p>
+          <button onClick={() => onNav("symbols")} className="flex items-center gap-1 text-xs text-primary hover:underline min-h-[36px]">
+            Browse all <ChevronRight size={11} />
+          </button>
+        </div>
+        <div className="space-y-2">
+          {symbolCategories.map(cat => (
+            <div key={cat.name} className="bg-card border border-border rounded-xl px-4 py-3.5 flex items-center gap-4">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">{cat.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{cat.desc}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded">{cat.count} symbols</span>
+                <div className="flex gap-1">
+                  {CARE_SYMBOLS.filter(s => s.category === cat.name.toLowerCase()).slice(0, 3).map(sym => (
+                    <span key={sym.id} className="opacity-50">
+                      <SymbolSVG symbol={sym} size={16} />
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Plan modes */}
+      <div className="mb-8">
+        <p className="text-xs font-mono tracking-widest text-muted-foreground uppercase mb-4">Laundry Plan Modes</p>
+        <div className="space-y-2">
+          {planModes.map((m, i) => (
+            <div key={m.name} className="bg-card border border-border rounded-xl px-4 py-3.5 flex items-start gap-4">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 mt-0.5" style={{ backgroundColor: m.color }}>
+                {i + 1}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground mb-0.5">{m.name}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{m.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Philosophy */}
+      <div className="mb-8 bg-[#8B5E3C]/5 border border-[#8B5E3C]/15 rounded-2xl p-6 sm:p-7">
+        <p className="text-xs font-mono tracking-widest text-[#8B5E3C] uppercase mb-3">Our Philosophy</p>
+        <h2 className="text-xl text-foreground mb-3" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 500 }}>
+          Clothes last longer when cared for properly.
+        </h2>
+        <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+          Most garment damage happens in the wash — wrong temperature, wrong cycle, or combining things that shouldn't share a load. ThreadCare exists to remove the guesswork.
+        </p>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          By helping you understand care labels and plan washes precisely, ThreadCare extends the life of the clothes you love — saving money, reducing waste, and keeping your wardrobe in its best condition.
+        </p>
+      </div>
+
+      {/* Version / meta */}
+      <div className="bg-card border border-border rounded-xl px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-foreground">ThreadCare</p>
+          <p className="text-xs text-muted-foreground font-mono mt-0.5">Version 1.0 · Built with React 18 + Tailwind CSS</p>
+        </div>
+        <div className="flex gap-2">
+          <Btn onClick={() => onNav("feedback")} variant="secondary" size="sm">
+            <MessageSquare size={13} /> Give Feedback
+          </Btn>
+          <Btn onClick={() => onNav("symbols")} variant="primary" size="sm">
+            <BookOpen size={13} /> Symbol Guide
+          </Btn>
+        </div>
+      </div>
+    </PageShell>
+  );
+}
+
 // ─── Feedback View ───────────────────────────────────────────────────────────
 type FeedbackType = "general" | "bug" | "feature" | "other";
 type FeedbackRating = 1 | 2 | 3 | 4 | 5;
@@ -2037,6 +2263,7 @@ function FeedbackView({ onBack }: { onBack: () => void }) {
 
 // ─── App Root ────────────────────────────────────────────────────────────────
 export default function App() {
+  const [darkMode, setDarkMode] = useState(false);
   const [mainView, setMainView] = useState<MainView>("home");
   const [symbolsSubview, setSymbolsSubview] = useState<SymbolsSubview>("guide");
   const [selectedSymbol, setSelectedSymbol] = useState<CareSymbol | null>(null);
@@ -2121,8 +2348,8 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-background" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <NavBar view={mainView} onNav={navigate} garmentCount={garments.length} />
+    <div className={`min-h-screen bg-background${darkMode ? " dark" : ""}`} style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <NavBar view={mainView} onNav={navigate} garmentCount={garments.length} darkMode={darkMode} onToggleDark={() => setDarkMode(d => !d)} />
 
       {mainView === "home" && (
         <HomeView garmentCount={garments.length} onNav={navigate} savedPlans={savedPlans} onViewSaved={() => { setMainView("plan"); setPlanSubview("saved"); }} onViewPlan={plan => { setViewingPlan(plan); setMainView("plan"); setPlanSubview("saved-detail"); }} />
@@ -2222,6 +2449,10 @@ export default function App() {
 
       {mainView === "feedback" && (
         <FeedbackView onBack={() => navigate("home")} />
+      )}
+
+      {mainView === "about" && (
+        <AboutView onBack={() => navigate("home")} onNav={navigate} />
       )}
     </div>
   );
