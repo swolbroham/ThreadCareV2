@@ -41,3 +41,10 @@ Thumbs.db
 
 # TypeScript build info
 *.tsbuildinfo
+
+# python backend stuff
+__pycache__/
+*.pyc
+backend/venv/
+backend/.env
+backend/*.db
