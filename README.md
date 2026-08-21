@@ -2,7 +2,7 @@
 
 ThreadCare is a laundry care web app that helps users manage garments and get personalized washing guidance — including care-symbol references and fabric-specific plans — so clothes get cleaned the right way every time.
 
-**Live demo:** [thread-care-v2.vercel.app](https://thread-care-v2.vercel.app)
+**Live demo:** [https://threadcare.vercel.app/](https://threadcare.vercel.app/)
 
 This project started as a prototype exported from [Figma Make](https://www.figma.com/design/LinmzsIErrey4yAaNcEysU/Enhance-ThreadCare-Prototype) and is being developed further from there.
 
