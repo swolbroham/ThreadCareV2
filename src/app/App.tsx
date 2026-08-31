@@ -1044,9 +1044,10 @@ function InlineSymbolPicker({ selected, onChange }: { selected: string[]; onChan
 }
 
 // ─── Garment Row (expandable inline edit) ────────────────────────────────────
-function GarmentRow({ garment, onUpdate, onDelete, onToggleFavorite }: {
+function GarmentRow({ garment, onUpdate, onDelete, onToggleFavorite, isCheckedForWash, onToggleWash }: {
   garment: Garment; onUpdate: (g: Garment) => void;
   onDelete: (id: string) => void; onToggleFavorite: (id: string) => void;
+  isCheckedForWash: boolean; onToggleWash: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [form, setForm] = useState({ ...garment, selectedSymbols: garment.selectedSymbols ?? [] });
@@ -1108,10 +1109,20 @@ function GarmentRow({ garment, onUpdate, onDelete, onToggleFavorite }: {
         aria-expanded={expanded}
         aria-label={`${expanded ? "Collapse" : "Expand"} ${garment.name}`}
       >
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: COLOR_SWATCHES[garment.colorGroup] + "35" }}>
+        {/* Wash checkbox */}
+        <button
+          type="button"
+          onClick={e => { e.stopPropagation(); onToggleWash(garment.id); }}
+          aria-label={`${isCheckedForWash ? "Unselect" : "Select"} ${garment.name} for washing`}
+          className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-150
+            ${isCheckedForWash ? "bg-primary border-primary" : "border-muted-foreground/40 hover:border-primary/60 bg-transparent"}`}
+        >
+          {isCheckedForWash && <Check size={11} className="text-primary-foreground" strokeWidth={2.5} />}
+        </button>
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-opacity ${isCheckedForWash ? "opacity-100" : "opacity-45"}`} style={{ backgroundColor: COLOR_SWATCHES[garment.colorGroup] + "35" }}>
           <span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLOR_SWATCHES[garment.colorGroup] }} />
         </div>
-        <div className="flex-1 min-w-0">
+        <div className={`flex-1 min-w-0 transition-opacity ${isCheckedForWash ? "opacity-100" : "opacity-50"}`}>
           <p className="font-medium text-foreground text-sm truncate">{garment.name}</p>
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
             <span className="text-xs text-muted-foreground font-mono">{FABRIC_LABELS[garment.fabricType]}</span>
@@ -1272,11 +1283,16 @@ function GarmentRow({ garment, onUpdate, onDelete, onToggleFavorite }: {
 }
 
 // ─── Garment List View ────────────────────────────────────────────────────────
-function GarmentListView({ garments, onAdd, onUpdate, onEdit, onDelete, onGeneratePlan, onToggleFavorite }: {
+function GarmentListView({ garments, onAdd, onUpdate, onEdit, onDelete, onGeneratePlan, onToggleFavorite, checkedForWash, onToggleWash, onSelectAll, onDeselectAll }: {
   garments: Garment[]; onAdd: () => void; onUpdate: (g: Garment) => void;
   onEdit: (g: Garment) => void; onDelete: (id: string) => void;
   onGeneratePlan: () => void; onToggleFavorite: (id: string) => void;
+  checkedForWash: Set<string>; onToggleWash: (id: string) => void;
+  onSelectAll: () => void; onDeselectAll: () => void;
 }) {
+  const checkedCount = garments.filter(g => checkedForWash.has(g.id)).length;
+  const allChecked = checkedCount === garments.length;
+
   return (
     <PageShell>
       <div className="flex items-end justify-between mb-6 sm:mb-8">
@@ -1299,16 +1315,39 @@ function GarmentListView({ garments, onAdd, onUpdate, onEdit, onDelete, onGenera
         </div>
       ) : (
         <>
+          {/* Wash selection toolbar */}
+          <div className="flex items-center justify-between gap-3 bg-card border border-border rounded-xl px-4 py-3 mb-3">
+            <div className="flex items-center gap-2">
+              <WashingMachineIcon size={14} className="text-muted-foreground flex-shrink-0" />
+              <p className="text-xs text-muted-foreground">
+                <span className="font-mono font-medium text-foreground">{checkedCount}</span>
+                <span className="font-mono text-muted-foreground"> / {garments.length}</span>
+                <span className="ml-1">selected for washing</span>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={allChecked ? onDeselectAll : onSelectAll}
+              className="text-xs font-medium text-primary hover:text-primary/80 hover:underline transition-colors min-h-[32px] px-1 flex-shrink-0"
+            >
+              {allChecked ? "Deselect all" : "Select all"}
+            </button>
+          </div>
+
           <div className="space-y-2.5 sm:space-y-3 mb-8 sm:mb-10">
             {garments.map(g => (
-              <GarmentRow key={g.id} garment={g} onUpdate={onUpdate} onDelete={onDelete} onToggleFavorite={onToggleFavorite} />
+              <GarmentRow key={g.id} garment={g} onUpdate={onUpdate} onDelete={onDelete} onToggleFavorite={onToggleFavorite} isCheckedForWash={checkedForWash.has(g.id)} onToggleWash={onToggleWash} />
             ))}
           </div>
           <div className="bg-primary rounded-2xl p-5 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <h3 className="text-primary-foreground font-medium" style={{ fontFamily: "'Playfair Display', serif" }}>Ready to plan your laundry?</h3>
-                <p className="text-primary-foreground/70 text-sm mt-0.5">Generate optimized loads from your {garments.length} garments.</p>
+                <p className="text-primary-foreground/70 text-sm mt-0.5">
+                  {checkedCount > 0
+                    ? `${checkedCount} garment${checkedCount !== 1 ? "s" : ""} selected for washing.`
+                    : `No garments selected — all ${garments.length} will be used.`}
+                </p>
               </div>
               <Btn onClick={onGeneratePlan} variant="secondary" className="sm:flex-shrink-0 bg-white/15 text-white hover:bg-white/25 border-0 justify-center sm:justify-start">
                 Generate Plan <Sparkles size={15} />
@@ -1322,8 +1361,8 @@ function GarmentListView({ garments, onAdd, onUpdate, onEdit, onDelete, onGenera
 }
 
 // ─── Priority Mode Selection ──────────────────────────────────────────────────
-function PriorityModeView({ selected, onSelect, onGenerate, garmentCount }: {
-  selected: PriorityMode; onSelect: (m: PriorityMode) => void; onGenerate: () => void; garmentCount: number;
+function PriorityModeView({ selected, onSelect, onGenerate, garmentCount, checkedCount }: {
+  selected: PriorityMode; onSelect: (m: PriorityMode) => void; onGenerate: () => void; garmentCount: number; checkedCount: number;
 }) {
   const modes: { id: PriorityMode; icon: React.ReactNode; title: string; subtitle: string; desc: string; detail: string[] }[] = [
     { id: "max-protection", icon: <Shield size={22} />, title: "Maximum Protection", subtitle: "Most loads — safest results", desc: "Separates garments by color, delicacy, and exact temperature. No garment is compromised.", detail: ["Each color group washed separately", "Delicates always isolated", "Exact wash temperature per garment", "Best for new or precious items"] },
@@ -1355,7 +1394,13 @@ function PriorityModeView({ selected, onSelect, onGenerate, garmentCount }: {
         ))}
       </div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-card border border-border rounded-xl px-4 sm:px-5 py-4">
-        <p className="text-sm text-muted-foreground">Planning for <span className="font-medium text-foreground font-mono">{garmentCount}</span> garments</p>
+        <p className="text-sm text-muted-foreground">
+          Planning for{" "}
+          <span className="font-medium text-foreground font-mono">{checkedCount > 0 ? checkedCount : garmentCount}</span> garment{(checkedCount > 0 ? checkedCount : garmentCount) !== 1 ? "s" : ""}
+          {checkedCount > 0 && checkedCount < garmentCount && (
+            <span className="text-muted-foreground/70"> (selected for washing)</span>
+          )}
+        </p>
         <Btn onClick={onGenerate} variant="primary" disabled={garmentCount === 0} className="justify-center sm:justify-start">
           <Sparkles size={16} /> Generate Plan
         </Btn>
@@ -1404,9 +1449,9 @@ function SavePlanSheet({ isOpen, plan, mode, onSave, onClose }: {
 }
 
 // ─── Laundry Plan Results ─────────────────────────────────────────────────────
-function LaundryPlanView({ plan, mode, onBack, onRedo, onSave, isSaved }: {
+function LaundryPlanView({ plan, mode, onBack, onRedo, onSave, isSaved, onRemoveGarment }: {
   plan: LaundryPlan; mode: PriorityMode; onBack: () => void; onRedo: () => void;
-  onSave: () => void; isSaved: boolean;
+  onSave: () => void; isSaved: boolean; onRemoveGarment?: (garmentId: string) => void;
 }) {
   return (
     <PageShell>
@@ -1453,10 +1498,13 @@ function LaundryPlanView({ plan, mode, onBack, onRedo, onSave, isSaved }: {
             <div className="px-4 sm:px-6 py-4">
               <div className="flex flex-wrap gap-2 mb-3">
                 {load.garments.map(g => (
-                  <div key={g.id} className="flex items-center gap-1.5 bg-secondary/60 rounded-lg px-2.5 py-1.5">
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: COLOR_SWATCHES[g.colorGroup] }} />
-                    <span className="text-xs text-foreground font-medium">{g.name}</span>
-                  </div>
+                  <button key={g.id} onClick={() => onRemoveGarment?.(g.id)}
+                    title={onRemoveGarment ? `Remove ${g.name} from this load` : g.name}
+                    className={`group flex items-center gap-1.5 bg-secondary/60 border border-transparent rounded-lg px-2.5 py-1.5 transition-all duration-150 ${onRemoveGarment ? "hover:bg-destructive/10 hover:border-destructive/25 cursor-pointer" : "cursor-default"}`}>
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${onRemoveGarment ? "transition-opacity group-hover:opacity-60" : ""}`} style={{ backgroundColor: COLOR_SWATCHES[g.colorGroup] }} />
+                    <span className={`text-xs text-foreground font-medium ${onRemoveGarment ? "group-hover:text-destructive transition-colors" : ""}`}>{g.name}</span>
+                    {onRemoveGarment && <X size={10} className="flex-shrink-0 text-destructive opacity-0 group-hover:opacity-100 transition-opacity -mr-0.5" />}
+                  </button>
                 ))}
               </div>
               <div className="flex flex-wrap gap-2.5 sm:gap-3 mb-3">
@@ -1491,10 +1539,13 @@ function LaundryPlanView({ plan, mode, onBack, onRedo, onSave, isSaved }: {
           <div className="px-4 sm:px-6 py-4">
             <div className="flex flex-wrap gap-2 mb-3">
               {plan.handWashItems.map(g => (
-                <div key={g.id} className="flex items-center gap-1.5 bg-[#5B7FA6]/10 rounded-lg px-2.5 py-1.5">
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COLOR_SWATCHES[g.colorGroup] }} />
-                  <span className="text-xs text-foreground font-medium">{g.name}</span>
-                </div>
+                <button key={g.id} onClick={() => onRemoveGarment?.(g.id)}
+                  title={onRemoveGarment ? `Remove ${g.name} from hand wash` : g.name}
+                  className={`group flex items-center gap-1.5 bg-[#5B7FA6]/10 border border-transparent rounded-lg px-2.5 py-1.5 transition-all duration-150 ${onRemoveGarment ? "hover:bg-destructive/10 hover:border-destructive/25 cursor-pointer" : "cursor-default"}`}>
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${onRemoveGarment ? "transition-opacity group-hover:opacity-60" : ""}`} style={{ backgroundColor: COLOR_SWATCHES[g.colorGroup] }} />
+                  <span className={`text-xs text-foreground font-medium ${onRemoveGarment ? "group-hover:text-destructive transition-colors" : ""}`}>{g.name}</span>
+                  {onRemoveGarment && <X size={10} className="flex-shrink-0 text-destructive opacity-0 group-hover:opacity-100 transition-opacity -mr-0.5" />}
+                </button>
               ))}
             </div>
             <div className="flex items-start gap-2 bg-primary/5 border border-primary/15 rounded-lg px-3 py-2">
@@ -2271,6 +2322,7 @@ export default function App() {
   const [editingGarment, setEditingGarment] = useState<Garment | undefined>();
   const [planSubview, setPlanSubview] = useState<PlanSubview>("priority");
   const [garments, setGarments] = useState<Garment[]>(INITIAL_GARMENTS);
+  const [checkedForWash, setCheckedForWash] = useState<Set<string>>(new Set(INITIAL_GARMENTS.map(g => g.id)));
   const [priorityMode, setPriorityMode] = useState<PriorityMode>("balanced");
   const [laundryPlan, setLaundryPlan] = useState<LaundryPlan | null>(null);
 
@@ -2297,18 +2349,43 @@ export default function App() {
   const handleAddGarment = () => { setEditingGarment(undefined); setScannedSymbols(undefined); setWardrobeSubview("form"); };
   const handleSaveGarment = (g: Garment) => {
     setGarments(prev => editingGarment ? prev.map(x => x.id === g.id ? g : x) : [...prev, g]);
+    if (!editingGarment) setCheckedForWash(prev => new Set([...prev, g.id]));
     setWardrobeSubview("list");
   };
-  const handleDeleteGarment = (id: string) => setGarments(prev => prev.filter(g => g.id !== id));
+  const handleDeleteGarment = (id: string) => {
+    setGarments(prev => prev.filter(g => g.id !== id));
+    setCheckedForWash(prev => { const next = new Set(prev); next.delete(id); return next; });
+  };
+  const handleToggleWash = (id: string) => setCheckedForWash(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const handleSelectAllForWash = () => setCheckedForWash(new Set(garments.map(g => g.id)));
+  const handleDeselectAllForWash = () => setCheckedForWash(new Set());
   const handleUpdateGarment = (g: Garment) => setGarments(prev => prev.map(x => x.id === g.id ? g : x));
   const handleToggleFavorite = (id: string) => setGarments(prev => prev.map(g => g.id === id ? { ...g, isFavorite: !g.isFavorite } : g));
 
   const handleGeneratePlan = () => {
-    setLaundryPlan(generateLaundryPlan(garments, priorityMode));
+    const forWash = garments.filter(g => checkedForWash.has(g.id));
+    setLaundryPlan(generateLaundryPlan(forWash.length > 0 ? forWash : garments, priorityMode));
     setIsPlanSaved(false);
     setPlanSubview("results");
   };
   const handleGoToPlan = () => { setMainView("plan"); setPlanSubview("priority"); };
+
+  const handleRemoveGarmentFromPlan = (garmentId: string) => {
+    setLaundryPlan(prev => {
+      if (!prev) return prev;
+      return {
+        loads: prev.loads
+          .map(load => ({ ...load, garments: load.garments.filter(g => g.id !== garmentId) }))
+          .filter(load => load.garments.length > 0),
+        handWashItems: prev.handWashItems.filter(g => g.id !== garmentId),
+      };
+    });
+    setCheckedForWash(prev => { const next = new Set(prev); next.delete(garmentId); return next; });
+  };
 
   const handleSavePlan = (name: string) => {
     if (!laundryPlan) return;
@@ -2363,7 +2440,7 @@ export default function App() {
 
       {mainView === "wardrobe" && (
         wardrobeSubview === "list" ? (
-          <GarmentListView garments={garments} onAdd={handleAddGarment} onUpdate={handleUpdateGarment} onEdit={handleEditGarment} onDelete={handleDeleteGarment} onGeneratePlan={handleGoToPlan} onToggleFavorite={handleToggleFavorite} />
+          <GarmentListView garments={garments} onAdd={handleAddGarment} onUpdate={handleUpdateGarment} onEdit={handleEditGarment} onDelete={handleDeleteGarment} onGeneratePlan={handleGoToPlan} onToggleFavorite={handleToggleFavorite} checkedForWash={checkedForWash} onToggleWash={handleToggleWash} onSelectAll={handleSelectAllForWash} onDeselectAll={handleDeselectAllForWash} />
         ) : wardrobeSubview === "form" ? (
           <GarmentForm editing={editingGarment} onSave={handleSaveGarment} onCancel={() => setWardrobeSubview("list")} onScanTag={handleScanTag} scannedSymbols={scannedSymbols} />
         ) : wardrobeSubview === "tag-upload" ? (
@@ -2385,10 +2462,10 @@ export default function App() {
 
       {mainView === "plan" && (
         planSubview === "priority" ? (
-          <PriorityModeView selected={priorityMode} onSelect={setPriorityMode} onGenerate={handleGeneratePlan} garmentCount={garments.length} />
+          <PriorityModeView selected={priorityMode} onSelect={setPriorityMode} onGenerate={handleGeneratePlan} garmentCount={garments.length} checkedCount={checkedForWash.size} />
         ) : planSubview === "results" && laundryPlan ? (
           <>
-            <LaundryPlanView plan={laundryPlan} mode={priorityMode} onBack={() => setPlanSubview("priority")} onRedo={handleGeneratePlan} onSave={() => setShowSaveSheet(true)} isSaved={isPlanSaved} />
+            <LaundryPlanView plan={laundryPlan} mode={priorityMode} onBack={() => setPlanSubview("priority")} onRedo={handleGeneratePlan} onSave={() => setShowSaveSheet(true)} isSaved={isPlanSaved} onRemoveGarment={handleRemoveGarmentFromPlan} />
             <SavePlanSheet isOpen={showSaveSheet} plan={laundryPlan} mode={priorityMode} onSave={handleSavePlan} onClose={() => setShowSaveSheet(false)} />
           </>
         ) : planSubview === "saved" && currentSavedPlan ? (
